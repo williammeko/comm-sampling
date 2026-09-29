@@ -1,0 +1,65 @@
+# ---- Build output (CMake out-of-source) ----
+build/
+cmake-build-*/
+out/
+
+# ---- CMake generated files (in-source builds) ----
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CMakeUserPresets.json
+compile_commands.json
+install_manifest.txt
+
+# ---- Compiled / linked artifacts ----
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.app
+*.dSYM/
+
+# ---- Qt ----
+*.pro.user
+*.pro.user.*
+
+# ---- IDEs / editors ----
+.vscode/
+.idea/
+*.user
+*.suo
+
+# ---- Editor temp / swap ----
+*~
+*.swp
+*.swo
+
+# ---- Logs ----
+*.log
+
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+
+# ---- Windows ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---- Linux ----
+.directory
+.Trash-*
