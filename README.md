@@ -73,7 +73,7 @@ cmake --build build --config Release --parallel
 
 ```bash
 # macOS / Linux
-./build/comm-sampling
+./build/comm-sampling.app/Contents/MacOS/comm-sampling
 
 # Windows
 build\Release\comm-sampling.exe

@@ -126,6 +126,33 @@ CommunicationSettingsWidget::CommunicationSettingsWidget(QWidget* parent)
             this, &CommunicationSettingsWidget::onModeChanged);
     connect(refreshButton, &QPushButton::clicked,
             this, &CommunicationSettingsWidget::refreshPorts);
+
+    auto markChanged = [this] { emit settingsChanged(); };
+    connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_portCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_baudCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_baudCombo, &QComboBox::editTextChanged,
+            this, [markChanged](const QString&) { markChanged(); });
+    connect(m_dataBitsCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_parityCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_stopBitsCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_hostEdit, &QLineEdit::textEdited,
+            this, [markChanged](const QString&) { markChanged(); });
+    connect(m_clientPortSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_ifaceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_serverPortSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [markChanged](int) { markChanged(); });
+    connect(m_cacheSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [markChanged](int) { markChanged(); });
+
     for (QPushButton* button : m_toggleButtons)
         connect(button, &QPushButton::clicked, this, &CommunicationSettingsWidget::onToggleClicked);
 }

@@ -40,6 +40,7 @@ void MatcherPipeline::feed(const QByteArray& data)
                 return;
 
             for (const QByteArray& frame : frames) {
+                emit frameMatched(i, frame); // show the picker's input frames
                 const QList<QVariant> values = pickerMatcher->computeValues(frame);
                 for (int p = 0; p < values.size(); ++p)
                     emit pickerValueChanged(i, p, values.at(p), values.at(p).isValid());

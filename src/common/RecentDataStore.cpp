@@ -44,6 +44,7 @@ bool RecentDataStore::load(State& out)
     out.serverPort = comm.value(QStringLiteral("serverPort")).toInt(8080);
     out.byteCacheSize = comm.value(QStringLiteral("byteCacheSize")).toInt(10000);
     out.rawDataBytes = comm.value(QStringLiteral("rawDataBytes")).toInt(2000);
+    out.loopIntervalMs = comm.value(QStringLiteral("loopIntervalMs")).toInt(1000);
 
     out.sendHistory.clear();
     const QJsonArray sendArr = root.value(QStringLiteral("sendHistory")).toArray();
@@ -73,6 +74,7 @@ bool RecentDataStore::save(const State& in)
     comm.insert(QStringLiteral("serverPort"), in.serverPort);
     comm.insert(QStringLiteral("byteCacheSize"), in.byteCacheSize);
     comm.insert(QStringLiteral("rawDataBytes"), in.rawDataBytes);
+    comm.insert(QStringLiteral("loopIntervalMs"), in.loopIntervalMs);
 
     QJsonArray sendArr;
     for (const QString& s : in.sendHistory)

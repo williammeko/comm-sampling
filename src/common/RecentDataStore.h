@@ -31,6 +31,7 @@ public:
 
         int byteCacheSize = 10000;
         int rawDataBytes = 2000;
+        int loopIntervalMs = 1000;
 
         QStringList sendHistory;
         QStringList keywordHistory;

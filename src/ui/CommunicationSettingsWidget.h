@@ -39,6 +39,7 @@ public:
 signals:
     void connectRequested();
     void disconnectRequested();
+    void settingsChanged();
 
 private slots:
     void onModeChanged(int index);

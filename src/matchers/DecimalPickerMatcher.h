@@ -37,6 +37,7 @@ struct Picker
     ByteOrder byteOrder = ByteOrder::BigEndian;
     QList<BitAdjustment> adjustments;
 
+    bool customName = false;
     QString name;  // assigned globally: val0, val1, ...
     QColor color;  // assigned globally
 };

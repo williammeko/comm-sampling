@@ -42,6 +42,8 @@ public:
 signals:
     void structureChanged();   // a picker was added/removed
     void keywordUsed(const QString& text);
+    void pickerNameChanged();
+    void configChanged();      // any matcher setting changed
     void removeRequested();
     void moveUpRequested();
     void moveDownRequested();

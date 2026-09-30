@@ -96,6 +96,9 @@ public:
         m_dstEndSpin->setValue(adj.dstEndBit);
     }
 
+signals:
+    void changed();
+
 private slots:
     void writeBack()
     {
@@ -106,6 +109,7 @@ private slots:
         adj.dstByte = m_dstByteSpin->value();
         adj.dstStartBit = m_dstStartSpin->value();
         adj.dstEndBit = m_dstEndSpin->value();
+        emit changed();
     }
 
 private:
@@ -140,8 +144,9 @@ public:
         auto* row = new QHBoxLayout;
         row->setContentsMargins(0, 0, 0, 0);
 
-        m_nameLabel = new QLabel(this);
-        m_nameLabel->setMinimumWidth(40);
+        m_nameEdit = new QLineEdit(this);
+        m_nameEdit->setMinimumWidth(60);
+        m_nameEdit->setMaximumWidth(120);
 
         m_unitCombo = new QComboBox(this);
         m_unitCombo->addItem(tr("bits"), static_cast<int>(Picker::Unit::Bits));
@@ -172,7 +177,7 @@ public:
         m_startLabel = new QLabel(tr("start"), this);
         m_lenLabel = new QLabel(tr("len"), this);
 
-        row->addWidget(m_nameLabel);
+        row->addWidget(m_nameEdit);
         row->addWidget(m_unitCombo);
         row->addWidget(m_startLabel);
         row->addWidget(m_startSpin);
@@ -218,6 +223,13 @@ public:
                 this, &PickerRowWidget::onTypeChanged);
         connect(m_orderCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &PickerRowWidget::onOrderChanged);
+        connect(m_nameEdit, &QLineEdit::textEdited, this, [this](const QString& text) {
+            Picker& picker = m_matcher->pickers()[m_pickerIndex];
+            picker.name = text.trimmed();
+            picker.customName = !picker.name.isEmpty();
+            emit nameChanged();
+            emit configChanged();
+        });
         connect(m_addButton, &QPushButton::clicked, this, &PickerRowWidget::addAdjustment);
         connect(m_removeButton, &QPushButton::clicked, this, &PickerRowWidget::removeLastAdjustment);
         connect(removeButton, &QPushButton::clicked, this, [this]() {
@@ -233,7 +245,7 @@ public:
         m_lengthSpin->setValue(picker.length);
         m_typeCombo->setCurrentIndex(m_typeCombo->findData(static_cast<int>(picker.numberType)));
         m_orderCombo->setCurrentIndex(m_orderCombo->findData(static_cast<int>(picker.byteOrder)));
-        m_nameLabel->setText(picker.name);
+        m_nameEdit->setText(picker.name);
         setNameColor(picker.color);
         rebuildAdjustmentRows();
         updateVisibility();
@@ -243,7 +255,7 @@ public:
     void setNameColor(const QColor& color)
     {
         m_color = color;
-        m_nameLabel->setStyleSheet(QStringLiteral("color: %1; font-weight: bold;").arg(color.name()));
+        m_nameEdit->setStyleSheet(QStringLiteral("color: %1; background: white;").arg(color.name()));
         m_resultEdit->setStyleSheet(QStringLiteral("color: %1; background: white;").arg(color.name()));
     }
 
@@ -264,6 +276,8 @@ public:
 
 signals:
     void removeRequested(int pickerIndex);
+    void nameChanged();
+    void configChanged();
 
 private slots:
     void onUnitChanged(int)
@@ -273,21 +287,33 @@ private slots:
         rebuildAdjustmentRows();
         updateVisibility();
         m_resultEdit->clear();
+        emit configChanged();
     }
 
-    void onStartChanged(int value) { m_matcher->pickers()[m_pickerIndex].start = value; }
-    void onLengthChanged(int value) { m_matcher->pickers()[m_pickerIndex].length = value; }
+    void onStartChanged(int value)
+    {
+        m_matcher->pickers()[m_pickerIndex].start = value;
+        emit configChanged();
+    }
+
+    void onLengthChanged(int value)
+    {
+        m_matcher->pickers()[m_pickerIndex].length = value;
+        emit configChanged();
+    }
 
     void onTypeChanged(int)
     {
         m_matcher->pickers()[m_pickerIndex].numberType =
             static_cast<NumberType>(m_typeCombo->currentData().toInt());
+        emit configChanged();
     }
 
     void onOrderChanged(int)
     {
         m_matcher->pickers()[m_pickerIndex].byteOrder =
             static_cast<ByteOrder>(m_orderCombo->currentData().toInt());
+        emit configChanged();
     }
 
     void addAdjustment()
@@ -295,6 +321,7 @@ private slots:
         m_matcher->pickers()[m_pickerIndex].adjustments.append(BitAdjustment());
         rebuildAdjustmentRows();
         m_resultEdit->clear();
+        emit configChanged();
     }
 
     void removeLastAdjustment()
@@ -304,6 +331,7 @@ private slots:
             adjustments.removeLast();
         rebuildAdjustmentRows();
         m_resultEdit->clear();
+        emit configChanged();
     }
 
 private:
@@ -318,6 +346,7 @@ private:
         const auto& adjustments = m_matcher->pickers().at(m_pickerIndex).adjustments;
         for (int i = 0; i < adjustments.size(); ++i) {
             auto* row = new AdjustmentRowWidget(m_matcher, m_pickerIndex, i, m_adjustmentContainer);
+            connect(row, &AdjustmentRowWidget::changed, this, &PickerRowWidget::configChanged);
             m_adjustmentRows.append(row);
             m_adjustmentRowsLayout->addWidget(row);
         }
@@ -345,7 +374,7 @@ private:
     int m_pickerIndex = 0;
     QColor m_color;
 
-    QLabel* m_nameLabel = nullptr;
+    QLineEdit* m_nameEdit = nullptr;
     QComboBox* m_unitCombo = nullptr;
     QLabel* m_startLabel = nullptr;
     QSpinBox* m_startSpin = nullptr;
@@ -438,6 +467,21 @@ MatcherItemWidget::MatcherItemWidget(Matcher* matcher, int index, QWidget* paren
 
         m_addPickerButton = new QPushButton(tr("Add picker"), this);
         outer->addWidget(m_addPickerButton);
+
+        auto* resultHeader = new QHBoxLayout;
+        resultHeader->addWidget(new QLabel(tr("Input frames (from previous matcher):"), this));
+        resultHeader->addStretch(1);
+        resultHeader->addWidget(new QLabel(tr("Keep:"), this));
+        m_keepFramesSpin = new QSpinBox(this);
+        m_keepFramesSpin->setRange(1, 10000);
+        m_keepFramesSpin->setValue(100);
+        resultHeader->addWidget(m_keepFramesSpin);
+        outer->addLayout(resultHeader);
+
+        m_resultEdit = new QPlainTextEdit(this);
+        m_resultEdit->setReadOnly(true);
+        m_resultEdit->setMinimumHeight(80);
+        outer->addWidget(m_resultEdit);
 
         connect(m_addPickerButton, &QPushButton::clicked, this, &MatcherItemWidget::addPicker);
         rebuildPickerRows();
@@ -540,6 +584,8 @@ void MatcherItemWidget::rebuildPickerRows()
     for (int i = 0; i < pickers.size(); ++i) {
         auto* row = new PickerRowWidget(pickerMatcher, i, this);
         connect(row, &PickerRowWidget::removeRequested, this, &MatcherItemWidget::removePicker);
+        connect(row, &PickerRowWidget::nameChanged, this, &MatcherItemWidget::pickerNameChanged);
+        connect(row, &PickerRowWidget::configChanged, this, &MatcherItemWidget::configChanged);
         m_pickerRows.append(row);
         m_pickerLayout->addWidget(row);
     }
@@ -569,6 +615,7 @@ void MatcherItemWidget::onKeywordTextChanged(const QString& text)
         HexUtils::parseHexBytes(text, keyword);
         keywordMatcher->setKeyword(keyword);
     }
+    emit configChanged();
 }
 
 void MatcherItemWidget::onKeywordSubmitted()
@@ -582,6 +629,7 @@ void MatcherItemWidget::onFrameLengthChanged(int length)
 {
     if (auto* keywordMatcher = dynamic_cast<FixedKeywordFrameMatcher*>(m_matcher))
         keywordMatcher->setFrameLength(length);
+    emit configChanged();
 }
 
 } // namespace comm

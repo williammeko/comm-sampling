@@ -37,6 +37,9 @@ RawDataWidget::RawDataWidget(QWidget* parent)
     m_view->setMaximumHeight(120);
     layout->addWidget(m_view);
 
+    connect(m_maxBytesSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &RawDataWidget::settingsChanged);
+
     m_clock.start();
 }
 

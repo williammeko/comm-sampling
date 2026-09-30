@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QHash>
+#include <QJsonObject>
 #include <QList>
 #include <QMainWindow>
 #include <QVariant>
@@ -20,6 +21,7 @@ class CommunicationSettingsWidget;
 class SendingWidget;
 class RawDataWidget;
 class MatchersWidget;
+class ProfileWidget;
 class ChannelManager;
 class ByteCache;
 class MatcherPipeline;
@@ -45,16 +47,23 @@ private slots:
     void onMatchersChanged();
     void onChannelError(const QString& message);
     void onChartMaximize(bool maximize);
+    void onAnyChange();
+    void onProfileLoad(const QString& name);
+    void onProfileSave(const QString& name);
+    void autosaveRecent();
 
 private:
     void rebuildChartSeries();
     void loadRecentData();
     void saveRecentData();
+    QJsonObject buildState() const;
+    void applyState(const QJsonObject& state);
 
     CommunicationSettingsWidget* m_commWidget = nullptr;
     SendingWidget* m_sendingWidget = nullptr;
     RawDataWidget* m_rawDataWidget = nullptr;
     MatchersWidget* m_matchersWidget = nullptr;
+    ProfileWidget* m_profileWidget = nullptr;
     LineChartWidget* m_lineChartWidget = nullptr;
 
     ChannelManager* m_channelManager = nullptr;
@@ -63,6 +72,7 @@ private:
     DataSender* m_dataSender = nullptr;
 
     QTimer* m_drainTimer = nullptr;
+    QTimer* m_autosaveTimer = nullptr;
 
     QVBoxLayout* m_centralLayout = nullptr;
     QGroupBox* m_commGroup = nullptr;
@@ -73,6 +83,7 @@ private:
     QHash<int, int> m_pickerToSeries; // key = matcherIndex*10000 + pickerIndex
 
     RecentDataStore::State m_state;
+    bool m_loadingState = false;
 };
 
 } // namespace comm

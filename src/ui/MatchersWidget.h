@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QJsonArray>
 #include <QList>
 #include <QStringList>
 #include <QVariant>
@@ -32,9 +33,13 @@ public:
     void setKeywordHistory(const QStringList& history);
     QStringList keywordHistory() const { return m_keywordHistory; }
 
+    QJsonArray matchersToJson() const;
+    void applyMatchersJson(const QJsonArray& matchers);
+
 signals:
     void matchersChanged();
     void keywordHistoryChanged();
+    void anythingChanged();
 
 private slots:
     void addMatcher();
@@ -46,6 +51,7 @@ private slots:
 
 private:
     Matcher* createMatcherOfSelectedType();
+    void addMatcherItem(Matcher* matcher);
     void rebuildLayout();
     void reindexItems();
     void reassignPickerNames();

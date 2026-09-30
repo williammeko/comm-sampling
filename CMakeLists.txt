@@ -12,6 +12,7 @@ set(PROJECT_SOURCES
     src/common/ByteCache.cpp
     src/common/HexUtils.cpp
     src/common/RecentDataStore.cpp
+    src/common/ProfileStore.cpp
     src/communication/AbstractChannel.h
     src/communication/ChannelManager.cpp
     src/communication/SerialChannel.cpp
@@ -25,6 +26,7 @@ set(PROJECT_SOURCES
     src/ui/MainWindow.cpp
     src/ui/CommunicationSettingsWidget.cpp
     src/ui/SendingWidget.cpp
+    src/ui/ProfileWidget.cpp
     src/ui/RawDataWidget.cpp
     src/ui/MatchersWidget.cpp
     src/ui/MatcherItemWidget.cpp

@@ -49,6 +49,8 @@ SendingWidget::SendingWidget(DataSender* sender, QWidget* parent)
     connect(m_stopButton, &QPushButton::clicked, this, &SendingWidget::stopRequested);
     if (m_sender)
         connect(m_sender, &DataSender::historyChanged, this, &SendingWidget::onHistoryChanged);
+    connect(m_intervalSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &SendingWidget::settingsChanged);
 }
 
 void SendingWidget::onSendClicked()
@@ -94,6 +96,16 @@ void SendingWidget::setLooping(bool looping)
 {
     m_looping = looping;
     refreshButtons();
+}
+
+int SendingWidget::intervalMs() const
+{
+    return m_intervalSpin->value();
+}
+
+void SendingWidget::setIntervalMs(int ms)
+{
+    m_intervalSpin->setValue(ms);
 }
 
 void SendingWidget::refreshButtons()

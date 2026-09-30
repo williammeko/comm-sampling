@@ -1,5 +1,6 @@
 #include "LineChartWidget.h"
 
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -11,7 +12,22 @@
 
 #include <QtGlobal>
 
+#include <cmath>
+
 namespace comm {
+
+namespace {
+
+constexpr double kMinLabelDistance = 48.0;
+
+QString formatValue(double v)
+{
+    if (v == std::floor(v) && std::abs(v) < 1e15)
+        return QString::number(static_cast<qint64>(v));
+    return QString::number(v, 'g', 6);
+}
+
+} // namespace
 
 class ChartCanvas : public QWidget
 {
@@ -27,6 +43,16 @@ public:
 
     void setSeries(const QList<SeriesInfo>& series)
     {
+        if (series.size() == m_series.size()) {
+            // Same count: update names/colors in place, keep the plotted points.
+            for (int i = 0; i < series.size(); ++i) {
+                m_series[i].name = series.at(i).name;
+                m_series[i].color = series.at(i).color;
+            }
+            update();
+            return;
+        }
+
         m_series.clear();
         m_series.reserve(series.size());
         for (const SeriesInfo& info : series) {
@@ -46,6 +72,20 @@ public:
         const double t = m_clock.elapsed() / 1000.0;
         m_series[seriesIndex].points.append({t, value});
         prune(nowSeconds());
+    }
+
+    void setSeriesVisible(int seriesIndex, bool visible)
+    {
+        if (seriesIndex >= 0 && seriesIndex < m_series.size()) {
+            m_series[seriesIndex].visible = visible;
+            update();
+        }
+    }
+
+    void setShowValues(bool show)
+    {
+        m_showValues = show;
+        update();
     }
 
     void setDuration(int ms) { m_durationMs = qMax(10, ms); }
@@ -137,18 +177,48 @@ protected:
                              QString::number(v, 'g', 4));
         }
 
-        // Draw each series polyline in its own color.
+        // Draw each visible series in its own color, plus value labels.
         for (const SeriesData& s : m_series) {
-            if (s.points.size() < 2)
+            if (!s.visible || s.points.isEmpty())
                 continue;
 
-            QPolygonF polyline;
-            polyline.reserve(s.points.size());
-            for (const Point& pt : s.points)
-                polyline.append(QPointF(tx(pt.t), ty(pt.v)));
+            if (s.points.size() >= 2) {
+                QPolygonF polyline;
+                polyline.reserve(s.points.size());
+                for (const Point& pt : s.points)
+                    polyline.append(QPointF(tx(pt.t), ty(pt.v)));
 
-            painter.setPen(QPen(s.color, 2));
-            painter.drawPolyline(polyline);
+                painter.setPen(QPen(s.color, 2));
+                painter.drawPolyline(polyline);
+            }
+
+            // Value labels near the points, spaced out to avoid crowding.
+            if (m_showValues) {
+                painter.setPen(s.color);
+                QPointF lastLabelPos;
+                bool hasLast = false;
+                for (int i = 0; i < s.points.size(); ++i) {
+                    const QPointF pos(tx(s.points.at(i).t), ty(s.points.at(i).v));
+                    const bool isLast = (i == s.points.size() - 1);
+
+                    bool label = isLast;
+                    if (!label) {
+                        if (!hasLast) {
+                            label = true;
+                        } else {
+                            const double dx = pos.x() - lastLabelPos.x();
+                            const double dy = pos.y() - lastLabelPos.y();
+                            label = (dx * dx + dy * dy) >= kMinLabelDistance * kMinLabelDistance;
+                        }
+                    }
+
+                    if (label) {
+                        painter.drawText(pos + QPointF(4, -4), formatValue(s.points.at(i).v));
+                        lastLabelPos = pos;
+                        hasLast = true;
+                    }
+                }
+            }
         }
 
         // Legend: names in their series colors, top-right.
@@ -175,6 +245,7 @@ private:
         QString name;
         QColor color;
         QList<Point> points;
+        bool visible = true;
     };
 
     double nowSeconds() const { return m_clock.elapsed() / 1000.0; }
@@ -192,6 +263,7 @@ private:
     QElapsedTimer m_clock;
     QTimer m_repaintTimer;
     int m_durationMs = 1000;
+    bool m_showValues = true;
 };
 
 LineChartWidget::LineChartWidget(QWidget* parent)
@@ -201,6 +273,9 @@ LineChartWidget::LineChartWidget(QWidget* parent)
 
     auto* topRow = new QHBoxLayout;
     topRow->addWidget(new QLabel(tr("Line chart")));
+    m_showValuesCheck = new QCheckBox(tr("Show values"), this);
+    m_showValuesCheck->setChecked(true);
+    topRow->addWidget(m_showValuesCheck);
     topRow->addStretch(1);
     topRow->addWidget(new QLabel(tr("Duration:")));
     m_durationSpin = new QSpinBox(this);
@@ -212,12 +287,19 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     topRow->addWidget(m_maximizeButton);
     layout->addLayout(topRow);
 
+    m_checksLayout = new QHBoxLayout;
+    m_checksLayout->setSpacing(8);
+    layout->addLayout(m_checksLayout);
+
     m_canvas = new ChartCanvas(this);
     m_canvas->setMinimumHeight(160);
     layout->addWidget(m_canvas, 1);
 
     connect(m_durationSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int ms) {
         m_canvas->setDuration(ms);
+    });
+    connect(m_showValuesCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        m_canvas->setShowValues(checked);
     });
     connect(m_maximizeButton, &QPushButton::clicked, this, &LineChartWidget::onMaximizeClicked);
 
@@ -227,6 +309,37 @@ LineChartWidget::LineChartWidget(QWidget* parent)
 void LineChartWidget::setSeries(const QList<SeriesInfo>& series)
 {
     m_canvas->setSeries(series);
+    rebuildSeriesChecks(series);
+}
+
+void LineChartWidget::rebuildSeriesChecks(const QList<SeriesInfo>& series)
+{
+    // Rename only: keep the existing checkboxes and their checked state.
+    if (series.size() == m_seriesChecks.size()) {
+        for (int i = 0; i < series.size(); ++i) {
+            m_seriesChecks.at(i)->setText(series.at(i).name);
+            m_seriesChecks.at(i)->setStyleSheet(
+                QStringLiteral("color: %1;").arg(series.at(i).color.name()));
+        }
+        return;
+    }
+
+    for (QCheckBox* check : m_seriesChecks) {
+        m_checksLayout->removeWidget(check);
+        delete check;
+    }
+    m_seriesChecks.clear();
+
+    for (int i = 0; i < series.size(); ++i) {
+        auto* check = new QCheckBox(series.at(i).name, this);
+        check->setChecked(true);
+        check->setStyleSheet(QStringLiteral("color: %1;").arg(series.at(i).color.name()));
+        connect(check, &QCheckBox::toggled, this, [this, i](bool checked) {
+            m_canvas->setSeriesVisible(i, checked);
+        });
+        m_seriesChecks.append(check);
+        m_checksLayout->addWidget(check);
+    }
 }
 
 void LineChartWidget::appendValue(int seriesIndex, double value)

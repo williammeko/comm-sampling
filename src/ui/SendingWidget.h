@@ -22,9 +22,13 @@ public:
     void setConnected(bool connected);
     void setLooping(bool looping);
 
+    int intervalMs() const;
+    void setIntervalMs(int ms);
+
 signals:
     void sendRequested(const QByteArray& data, bool loop, int intervalMs);
     void stopRequested();
+    void settingsChanged();
 
 private slots:
     void onSendClicked();

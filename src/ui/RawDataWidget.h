@@ -26,6 +26,9 @@ public:
     void appendBytes(const QByteArray& bytes);
     void clear();
 
+signals:
+    void settingsChanged();
+
 private:
     void refreshDisplay();
 
