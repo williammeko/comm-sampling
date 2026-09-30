@@ -8,6 +8,18 @@
 
 namespace comm {
 
+// One bit-copy adjustment for the bits-adjustment picker mode:
+// byte[srcByte][srcStartBit:srcEndBit] -> newByte[dstByte][dstStartBit:dstEndBit]
+struct BitAdjustment
+{
+    int srcByte = 0;
+    int srcStartBit = 0;
+    int srcEndBit = 7;
+    int dstByte = 0;
+    int dstStartBit = 0;
+    int dstEndBit = 7;
+};
+
 // A single value extraction from a frame: a bit range or byte range plus
 // how to interpret it as a number.
 struct Picker
@@ -15,6 +27,7 @@ struct Picker
     enum class Unit {
         Bits,
         Bytes,
+        BitsAdjustment,
     };
 
     Unit unit = Unit::Bytes;
@@ -22,6 +35,7 @@ struct Picker
     int length = 2;
     NumberType numberType = NumberType::UInt;
     ByteOrder byteOrder = ByteOrder::BigEndian;
+    QList<BitAdjustment> adjustments;
 
     QString name;  // assigned globally: val0, val1, ...
     QColor color;  // assigned globally

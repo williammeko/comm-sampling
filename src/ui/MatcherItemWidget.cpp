@@ -22,8 +22,107 @@
 
 namespace comm {
 
+// One bit-copy adjustment row:
+// byte[srcByte][srcStart:srcEnd] -> newByte[dstByte][dstStart:dstEnd]
+class AdjustmentRowWidget : public QWidget
+{
+    Q_OBJECT
+
+public:
+    AdjustmentRowWidget(DecimalPickerMatcher* matcher, int pickerIndex, int adjustmentIndex,
+                        QWidget* parent = nullptr)
+        : QWidget(parent)
+        , m_matcher(matcher)
+        , m_pickerIndex(pickerIndex)
+        , m_adjustmentIndex(adjustmentIndex)
+    {
+        auto* layout = new QHBoxLayout(this);
+        layout->setContentsMargins(0, 0, 0, 0);
+
+        m_srcByteSpin = new QSpinBox(this);
+        m_srcByteSpin->setRange(0, 1000000);
+        m_srcStartSpin = new QSpinBox(this);
+        m_srcStartSpin->setRange(0, 7);
+        m_srcEndSpin = new QSpinBox(this);
+        m_srcEndSpin->setRange(0, 7);
+
+        m_dstByteSpin = new QSpinBox(this);
+        m_dstByteSpin->setRange(0, 1000000);
+        m_dstStartSpin = new QSpinBox(this);
+        m_dstStartSpin->setRange(0, 7);
+        m_dstEndSpin = new QSpinBox(this);
+        m_dstEndSpin->setRange(0, 7);
+
+        layout->addWidget(new QLabel(tr("byte["), this));
+        layout->addWidget(m_srcByteSpin);
+        layout->addWidget(new QLabel(tr("]["), this));
+        layout->addWidget(m_srcStartSpin);
+        layout->addWidget(new QLabel(tr(":"), this));
+        layout->addWidget(m_srcEndSpin);
+        layout->addWidget(new QLabel(tr("] -> newByte["), this));
+        layout->addWidget(m_dstByteSpin);
+        layout->addWidget(new QLabel(tr("]["), this));
+        layout->addWidget(m_dstStartSpin);
+        layout->addWidget(new QLabel(tr(":"), this));
+        layout->addWidget(m_dstEndSpin);
+        layout->addWidget(new QLabel(tr("]"), this));
+        layout->addStretch(1);
+
+        apply();
+
+        connect(m_srcByteSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+        connect(m_srcStartSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+        connect(m_srcEndSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+        connect(m_dstByteSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+        connect(m_dstStartSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+        connect(m_dstEndSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &AdjustmentRowWidget::writeBack);
+    }
+
+    void apply()
+    {
+        const BitAdjustment& adj =
+            m_matcher->pickers().at(m_pickerIndex).adjustments.at(m_adjustmentIndex);
+        m_srcByteSpin->setValue(adj.srcByte);
+        m_srcStartSpin->setValue(adj.srcStartBit);
+        m_srcEndSpin->setValue(adj.srcEndBit);
+        m_dstByteSpin->setValue(adj.dstByte);
+        m_dstStartSpin->setValue(adj.dstStartBit);
+        m_dstEndSpin->setValue(adj.dstEndBit);
+    }
+
+private slots:
+    void writeBack()
+    {
+        BitAdjustment& adj = m_matcher->pickers()[m_pickerIndex].adjustments[m_adjustmentIndex];
+        adj.srcByte = m_srcByteSpin->value();
+        adj.srcStartBit = m_srcStartSpin->value();
+        adj.srcEndBit = m_srcEndSpin->value();
+        adj.dstByte = m_dstByteSpin->value();
+        adj.dstStartBit = m_dstStartSpin->value();
+        adj.dstEndBit = m_dstEndSpin->value();
+    }
+
+private:
+    DecimalPickerMatcher* m_matcher = nullptr;
+    int m_pickerIndex = 0;
+    int m_adjustmentIndex = 0;
+
+    QSpinBox* m_srcByteSpin = nullptr;
+    QSpinBox* m_srcStartSpin = nullptr;
+    QSpinBox* m_srcEndSpin = nullptr;
+    QSpinBox* m_dstByteSpin = nullptr;
+    QSpinBox* m_dstStartSpin = nullptr;
+    QSpinBox* m_dstEndSpin = nullptr;
+};
+
 // One row of a decimal-picker matcher:
-// [valN] [bits/bytes] start [] len [] [type] [order] [result] [remove]
+// [valN] [bits/bytes/bits-adjustment] start [] len [] [type] [order] [result] [remove]
 class PickerRowWidget : public QWidget
 {
     Q_OBJECT
@@ -34,8 +133,12 @@ public:
         , m_matcher(matcher)
         , m_pickerIndex(pickerIndex)
     {
-        auto* layout = new QHBoxLayout(this);
-        layout->setContentsMargins(0, 0, 0, 0);
+        auto* mainLayout = new QVBoxLayout(this);
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+        mainLayout->setSpacing(2);
+
+        auto* row = new QHBoxLayout;
+        row->setContentsMargins(0, 0, 0, 0);
 
         m_nameLabel = new QLabel(this);
         m_nameLabel->setMinimumWidth(40);
@@ -43,6 +146,7 @@ public:
         m_unitCombo = new QComboBox(this);
         m_unitCombo->addItem(tr("bits"), static_cast<int>(Picker::Unit::Bits));
         m_unitCombo->addItem(tr("bytes"), static_cast<int>(Picker::Unit::Bytes));
+        m_unitCombo->addItem(tr("bits-adjustment"), static_cast<int>(Picker::Unit::BitsAdjustment));
 
         m_startSpin = new QSpinBox(this);
         m_startSpin->setRange(0, 1000000);
@@ -65,16 +169,42 @@ public:
 
         auto* removeButton = new QPushButton(tr("Remove"), this);
 
-        layout->addWidget(m_nameLabel);
-        layout->addWidget(m_unitCombo);
-        layout->addWidget(new QLabel(tr("start")));
-        layout->addWidget(m_startSpin);
-        layout->addWidget(new QLabel(tr("len")));
-        layout->addWidget(m_lengthSpin);
-        layout->addWidget(m_typeCombo);
-        layout->addWidget(m_orderCombo);
-        layout->addWidget(m_resultEdit, 1);
-        layout->addWidget(removeButton);
+        m_startLabel = new QLabel(tr("start"), this);
+        m_lenLabel = new QLabel(tr("len"), this);
+
+        row->addWidget(m_nameLabel);
+        row->addWidget(m_unitCombo);
+        row->addWidget(m_startLabel);
+        row->addWidget(m_startSpin);
+        row->addWidget(m_lenLabel);
+        row->addWidget(m_lengthSpin);
+        row->addWidget(m_typeCombo);
+        row->addWidget(m_orderCombo);
+        row->addWidget(m_resultEdit, 1);
+        row->addWidget(removeButton);
+        mainLayout->addLayout(row);
+
+        // Bits-adjustment section: byte order + [+][-] + adjustment rows.
+        m_adjustmentContainer = new QWidget(this);
+        auto* adjustmentLayout = new QVBoxLayout(m_adjustmentContainer);
+        adjustmentLayout->setContentsMargins(12, 0, 0, 0);
+        adjustmentLayout->setSpacing(2);
+
+        auto* buttonRow = new QHBoxLayout;
+        m_addButton = new QPushButton(tr("+"), m_adjustmentContainer);
+        m_removeButton = new QPushButton(tr("-"), m_adjustmentContainer);
+        m_addButton->setFixedWidth(28);
+        m_removeButton->setFixedWidth(28);
+        buttonRow->addWidget(m_addButton);
+        buttonRow->addWidget(m_removeButton);
+        buttonRow->addStretch(1);
+        adjustmentLayout->addLayout(buttonRow);
+
+        m_adjustmentRowsLayout = new QVBoxLayout;
+        m_adjustmentRowsLayout->setContentsMargins(0, 0, 0, 0);
+        adjustmentLayout->addLayout(m_adjustmentRowsLayout);
+
+        mainLayout->addWidget(m_adjustmentContainer);
 
         applyPicker();
 
@@ -88,6 +218,8 @@ public:
                 this, &PickerRowWidget::onTypeChanged);
         connect(m_orderCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, &PickerRowWidget::onOrderChanged);
+        connect(m_addButton, &QPushButton::clicked, this, &PickerRowWidget::addAdjustment);
+        connect(m_removeButton, &QPushButton::clicked, this, &PickerRowWidget::removeLastAdjustment);
         connect(removeButton, &QPushButton::clicked, this, [this]() {
             emit removeRequested(m_pickerIndex);
         });
@@ -103,6 +235,7 @@ public:
         m_orderCombo->setCurrentIndex(m_orderCombo->findData(static_cast<int>(picker.byteOrder)));
         m_nameLabel->setText(picker.name);
         setNameColor(picker.color);
+        rebuildAdjustmentRows();
         updateVisibility();
         m_resultEdit->clear();
     }
@@ -137,7 +270,9 @@ private slots:
     {
         m_matcher->pickers()[m_pickerIndex].unit =
             static_cast<Picker::Unit>(m_unitCombo->currentData().toInt());
+        rebuildAdjustmentRows();
         updateVisibility();
+        m_resultEdit->clear();
     }
 
     void onStartChanged(int value) { m_matcher->pickers()[m_pickerIndex].start = value; }
@@ -155,13 +290,55 @@ private slots:
             static_cast<ByteOrder>(m_orderCombo->currentData().toInt());
     }
 
+    void addAdjustment()
+    {
+        m_matcher->pickers()[m_pickerIndex].adjustments.append(BitAdjustment());
+        rebuildAdjustmentRows();
+        m_resultEdit->clear();
+    }
+
+    void removeLastAdjustment()
+    {
+        QList<BitAdjustment>& adjustments = m_matcher->pickers()[m_pickerIndex].adjustments;
+        if (!adjustments.isEmpty())
+            adjustments.removeLast();
+        rebuildAdjustmentRows();
+        m_resultEdit->clear();
+    }
+
 private:
+    void rebuildAdjustmentRows()
+    {
+        for (AdjustmentRowWidget* row : m_adjustmentRows) {
+            m_adjustmentRowsLayout->removeWidget(row);
+            delete row;
+        }
+        m_adjustmentRows.clear();
+
+        const auto& adjustments = m_matcher->pickers().at(m_pickerIndex).adjustments;
+        for (int i = 0; i < adjustments.size(); ++i) {
+            auto* row = new AdjustmentRowWidget(m_matcher, m_pickerIndex, i, m_adjustmentContainer);
+            m_adjustmentRows.append(row);
+            m_adjustmentRowsLayout->addWidget(row);
+        }
+    }
+
     void updateVisibility()
     {
-        const bool bytes =
-            (m_unitCombo->currentData().toInt() == static_cast<int>(Picker::Unit::Bytes));
+        const Picker::Unit unit = static_cast<Picker::Unit>(m_unitCombo->currentData().toInt());
+        const bool bits = (unit == Picker::Unit::Bits);
+        const bool bytes = (unit == Picker::Unit::Bytes);
+        const bool adjust = (unit == Picker::Unit::BitsAdjustment);
+
+        m_startLabel->setVisible(bits || bytes);
+        m_startSpin->setVisible(bits || bytes);
+        m_lenLabel->setVisible(bits || bytes);
+        m_lengthSpin->setVisible(bits || bytes);
+
         m_typeCombo->setVisible(bytes);
-        m_orderCombo->setVisible(bytes);
+        m_orderCombo->setVisible(bytes || adjust);
+
+        m_adjustmentContainer->setVisible(adjust);
     }
 
     DecimalPickerMatcher* m_matcher = nullptr;
@@ -170,11 +347,19 @@ private:
 
     QLabel* m_nameLabel = nullptr;
     QComboBox* m_unitCombo = nullptr;
+    QLabel* m_startLabel = nullptr;
     QSpinBox* m_startSpin = nullptr;
+    QLabel* m_lenLabel = nullptr;
     QSpinBox* m_lengthSpin = nullptr;
     QComboBox* m_typeCombo = nullptr;
     QComboBox* m_orderCombo = nullptr;
     QLineEdit* m_resultEdit = nullptr;
+
+    QWidget* m_adjustmentContainer = nullptr;
+    QPushButton* m_addButton = nullptr;
+    QPushButton* m_removeButton = nullptr;
+    QVBoxLayout* m_adjustmentRowsLayout = nullptr;
+    QList<AdjustmentRowWidget*> m_adjustmentRows;
 };
 
 MatcherItemWidget::MatcherItemWidget(Matcher* matcher, int index, QWidget* parent)

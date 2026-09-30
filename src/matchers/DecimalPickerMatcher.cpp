@@ -48,6 +48,48 @@ QByteArray pickBits(const QByteArray& frame, int start, int length)
     return picked;
 }
 
+QByteArray applyAdjustments(const QByteArray& frame, const QList<BitAdjustment>& adjustments)
+{
+    if (frame.isEmpty() || adjustments.isEmpty())
+        return QByteArray();
+
+    int dstByteCount = 0;
+    for (const BitAdjustment& adj : adjustments)
+        dstByteCount = qMax(dstByteCount, adj.dstByte + 1);
+
+    QByteArray result(dstByteCount, '\0');
+
+    for (const BitAdjustment& adj : adjustments) {
+        if (adj.srcByte < 0 || adj.srcByte >= frame.size())
+            continue;
+        if (adj.dstByte < 0 || adj.dstByte >= dstByteCount)
+            continue;
+
+        const int srcDir = (adj.srcStartBit <= adj.srcEndBit) ? 1 : -1;
+        const int srcCount = qAbs(adj.srcEndBit - adj.srcStartBit) + 1;
+        const int dstDir = (adj.dstStartBit <= adj.dstEndBit) ? 1 : -1;
+        const int dstCount = qAbs(adj.dstEndBit - adj.dstStartBit) + 1;
+        const int count = qMin(srcCount, dstCount);
+
+        const unsigned char src = static_cast<unsigned char>(frame.at(adj.srcByte));
+
+        for (int i = 0; i < count; ++i) {
+            const int srcBit = adj.srcStartBit + i * srcDir;
+            const int dstBit = adj.dstStartBit + i * dstDir;
+            if (srcBit < 0 || srcBit > 7 || dstBit < 0 || dstBit > 7)
+                continue;
+
+            if ((src >> srcBit) & 1) {
+                unsigned char dst = static_cast<unsigned char>(result.at(adj.dstByte));
+                dst = static_cast<unsigned char>(dst | (1u << dstBit));
+                result[adj.dstByte] = static_cast<char>(dst);
+            }
+        }
+    }
+
+    return result;
+}
+
 } // namespace
 
 QList<QVariant> DecimalPickerMatcher::computeValues(const QByteArray& frame) const
@@ -57,16 +99,20 @@ QList<QVariant> DecimalPickerMatcher::computeValues(const QByteArray& frame) con
 
     for (const Picker& picker : m_pickers) {
         QByteArray picked;
-        if (picker.unit == Picker::Unit::Bytes)
-            picked = pickBytes(frame, picker.start, picker.length);
-        else
-            picked = pickBits(frame, picker.start, picker.length);
+        NumberType effectiveType = picker.numberType;
+        ByteOrder effectiveOrder = picker.byteOrder;
 
-        // Picking from bits only supports uint, always big-endian (MSB-first).
-        const NumberType effectiveType =
-            (picker.unit == Picker::Unit::Bits) ? NumberType::UInt : picker.numberType;
-        const ByteOrder effectiveOrder =
-            (picker.unit == Picker::Unit::Bits) ? ByteOrder::BigEndian : picker.byteOrder;
+        if (picker.unit == Picker::Unit::Bytes) {
+            picked = pickBytes(frame, picker.start, picker.length);
+        } else if (picker.unit == Picker::Unit::Bits) {
+            picked = pickBits(frame, picker.start, picker.length);
+            // Picking from bits only supports uint, always big-endian (MSB-first).
+            effectiveType = NumberType::UInt;
+            effectiveOrder = ByteOrder::BigEndian;
+        } else { // BitsAdjustment
+            picked = applyAdjustments(frame, picker.adjustments);
+            effectiveType = NumberType::UInt;
+        }
 
         values.append(DecimalConverter::convert(picked, effectiveType, effectiveOrder));
     }
