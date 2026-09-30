@@ -8,8 +8,8 @@ DataSender::DataSender(QObject* parent)
     : QObject(parent)
 {
     connect(&m_timer, &QTimer::timeout, this, [this]() {
-        if (m_write)
-            m_write(m_loopData);
+        if (m_write && m_loopProducer)
+            m_write(m_loopProducer());
     });
 }
 
@@ -24,10 +24,10 @@ void DataSender::sendOnce(const QByteArray& data)
         m_write(data);
 }
 
-void DataSender::startLoop(const QByteArray& data, int intervalMs)
+void DataSender::startLoop(const DataProducer& producer, int intervalMs)
 {
     stopLoop();
-    m_loopData = data;
+    m_loopProducer = producer;
     m_timer.start(qMax(1, intervalMs));
 }
 

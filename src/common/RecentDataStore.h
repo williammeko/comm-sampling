@@ -33,6 +33,11 @@ public:
         int rawDataBytes = 2000;
         int loopIntervalMs = 1000;
 
+        int sendStrategy = 0;
+        int sendCrcAlgorithm = 0;
+        QString fieldSpec;
+        QStringList fieldSpecHistory;
+
         QStringList sendHistory;
         QStringList keywordHistory;
     };

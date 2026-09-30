@@ -272,7 +272,6 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
 
     auto* topRow = new QHBoxLayout;
-    topRow->addWidget(new QLabel(tr("Line chart")));
     m_showValuesCheck = new QCheckBox(tr("Show values"), this);
     m_showValuesCheck->setChecked(true);
     topRow->addWidget(m_showValuesCheck);
@@ -283,8 +282,6 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     m_durationSpin->setValue(1000);
     m_durationSpin->setSuffix(tr(" ms"));
     topRow->addWidget(m_durationSpin);
-    m_maximizeButton = new QPushButton(tr("Maximize"), this);
-    topRow->addWidget(m_maximizeButton);
     layout->addLayout(topRow);
 
     m_checksLayout = new QHBoxLayout;
@@ -301,7 +298,6 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     connect(m_showValuesCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_canvas->setShowValues(checked);
     });
-    connect(m_maximizeButton, &QPushButton::clicked, this, &LineChartWidget::onMaximizeClicked);
 
     setEnabledState(false);
 }
@@ -364,13 +360,6 @@ int LineChartWidget::durationMs() const
 void LineChartWidget::clearChart()
 {
     m_canvas->clearChart();
-}
-
-void LineChartWidget::onMaximizeClicked()
-{
-    m_maximized = !m_maximized;
-    m_maximizeButton->setText(m_maximized ? tr("Restore") : tr("Maximize"));
-    emit maximizeRequested(m_maximized);
 }
 
 } // namespace comm

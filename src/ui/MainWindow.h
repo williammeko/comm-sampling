@@ -19,9 +19,9 @@ namespace comm {
 
 class CommunicationSettingsWidget;
 class SendingWidget;
-class RawDataWidget;
 class MatchersWidget;
 class ProfileWidget;
+class SectionWidget;
 class ChannelManager;
 class ByteCache;
 class MatcherPipeline;
@@ -43,10 +43,8 @@ private slots:
     void onDrainCache();
     void onFrameMatched(int matcherIndex, const QByteArray& frame);
     void onPickerValueChanged(int matcherIndex, int pickerIndex, const QVariant& value, bool valid);
-    void onSendRequested(const QByteArray& data, bool loop, int intervalMs);
     void onMatchersChanged();
     void onChannelError(const QString& message);
-    void onChartMaximize(bool maximize);
     void onAnyChange();
     void onProfileLoad(const QString& name);
     void onProfileSave(const QString& name);
@@ -58,10 +56,11 @@ private:
     void saveRecentData();
     QJsonObject buildState() const;
     void applyState(const QJsonObject& state);
+    void maximizeSection(SectionWidget* section);
+    void restoreSections();
 
     CommunicationSettingsWidget* m_commWidget = nullptr;
     SendingWidget* m_sendingWidget = nullptr;
-    RawDataWidget* m_rawDataWidget = nullptr;
     MatchersWidget* m_matchersWidget = nullptr;
     ProfileWidget* m_profileWidget = nullptr;
     LineChartWidget* m_lineChartWidget = nullptr;
@@ -76,8 +75,9 @@ private:
 
     QVBoxLayout* m_centralLayout = nullptr;
     QGroupBox* m_commGroup = nullptr;
-    QGroupBox* m_sendingGroup = nullptr;
-    QGroupBox* m_matchersGroup = nullptr;
+    SectionWidget* m_dataInteractionSection = nullptr;
+    SectionWidget* m_matcherSettingSection = nullptr;
+    SectionWidget* m_lineChartSection = nullptr;
 
     QList<SeriesInfo> m_series;
     QHash<int, int> m_pickerToSeries; // key = matcherIndex*10000 + pickerIndex

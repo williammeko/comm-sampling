@@ -23,11 +23,13 @@ set(PROJECT_SOURCES
     src/matchers/DecimalPickerMatcher.cpp
     src/matchers/MatcherPipeline.cpp
     src/sender/DataSender.cpp
+    src/sender/SendStrategy.cpp
     src/ui/MainWindow.cpp
     src/ui/CommunicationSettingsWidget.cpp
     src/ui/SendingWidget.cpp
     src/ui/ProfileWidget.cpp
     src/ui/RawDataWidget.cpp
+    src/ui/SectionWidget.cpp
     src/ui/MatchersWidget.cpp
     src/ui/MatcherItemWidget.cpp
     src/ui/LineChartWidget.cpp

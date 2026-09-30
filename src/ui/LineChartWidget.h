@@ -30,23 +30,15 @@ public:
     int durationMs() const;
     void clearChart();
 
-signals:
-    void maximizeRequested(bool maximize);
-
-private slots:
-    void onMaximizeClicked();
-
 private:
     void rebuildSeriesChecks(const QList<SeriesInfo>& series);
 
     QSpinBox* m_durationSpin = nullptr;
-    QPushButton* m_maximizeButton = nullptr;
     QCheckBox* m_showValuesCheck = nullptr;
     QHBoxLayout* m_checksLayout = nullptr;
     QList<QCheckBox*> m_seriesChecks;
     class ChartCanvas* m_canvas = nullptr;
     bool m_enabled = false;
-    bool m_maximized = false;
 };
 
 } // namespace comm

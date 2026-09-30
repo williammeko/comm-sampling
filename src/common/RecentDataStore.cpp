@@ -45,6 +45,14 @@ bool RecentDataStore::load(State& out)
     out.byteCacheSize = comm.value(QStringLiteral("byteCacheSize")).toInt(10000);
     out.rawDataBytes = comm.value(QStringLiteral("rawDataBytes")).toInt(2000);
     out.loopIntervalMs = comm.value(QStringLiteral("loopIntervalMs")).toInt(1000);
+    out.sendStrategy = root.value(QStringLiteral("sendStrategy")).toInt(0);
+    out.sendCrcAlgorithm = root.value(QStringLiteral("sendCrcAlgorithm")).toInt(0);
+    out.fieldSpec = root.value(QStringLiteral("fieldSpec")).toString();
+
+    out.fieldSpecHistory.clear();
+    const QJsonArray fieldSpecArr = root.value(QStringLiteral("fieldSpecHistory")).toArray();
+    for (const auto& value : fieldSpecArr)
+        out.fieldSpecHistory.append(value.toString());
 
     out.sendHistory.clear();
     const QJsonArray sendArr = root.value(QStringLiteral("sendHistory")).toArray();
@@ -84,8 +92,16 @@ bool RecentDataStore::save(const State& in)
     for (const QString& s : in.keywordHistory)
         keywordArr.append(s);
 
+    QJsonArray fieldSpecArr;
+    for (const QString& s : in.fieldSpecHistory)
+        fieldSpecArr.append(s);
+
     QJsonObject root;
     root.insert(QStringLiteral("comm"), comm);
+    root.insert(QStringLiteral("sendStrategy"), in.sendStrategy);
+    root.insert(QStringLiteral("sendCrcAlgorithm"), in.sendCrcAlgorithm);
+    root.insert(QStringLiteral("fieldSpec"), in.fieldSpec);
+    root.insert(QStringLiteral("fieldSpecHistory"), fieldSpecArr);
     root.insert(QStringLiteral("sendHistory"), sendArr);
     root.insert(QStringLiteral("keywordHistory"), keywordArr);
 

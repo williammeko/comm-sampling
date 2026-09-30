@@ -16,13 +16,14 @@ class DataSender : public QObject
 
 public:
     using WriteFunc = std::function<qint64(const QByteArray&)>;
+    using DataProducer = std::function<QByteArray()>;
 
     explicit DataSender(QObject* parent = nullptr);
 
     void setWriteFunc(WriteFunc func);
 
     void sendOnce(const QByteArray& data);
-    void startLoop(const QByteArray& data, int intervalMs);
+    void startLoop(const DataProducer& producer, int intervalMs);
     void stopLoop();
     bool isLooping() const { return m_timer.isActive(); }
 
@@ -41,7 +42,7 @@ signals:
 
 private:
     QTimer m_timer;
-    QByteArray m_loopData;
+    DataProducer m_loopProducer;
     WriteFunc m_write;
     QStringList m_history;
 };

@@ -7,10 +7,11 @@
 #include "matchers/DecimalPickerMatcher.h"
 #include "matchers/MatcherPipeline.h"
 #include "sender/DataSender.h"
+#include "sender/SendStrategy.h"
 #include "ui/CommunicationSettingsWidget.h"
 #include "ui/MatchersWidget.h"
 #include "ui/ProfileWidget.h"
-#include "ui/RawDataWidget.h"
+#include "ui/SectionWidget.h"
 #include "ui/SendingWidget.h"
 
 #include <QCoreApplication>
@@ -40,7 +41,6 @@ MainWindow::MainWindow(QWidget* parent)
 
     m_commWidget = new CommunicationSettingsWidget(central);
     m_sendingWidget = new SendingWidget(m_dataSender, central);
-    m_rawDataWidget = new RawDataWidget(central);
     m_matchersWidget = new MatchersWidget(central);
     m_profileWidget = new ProfileWidget(central);
     m_lineChartWidget = new LineChartWidget(central);
@@ -49,20 +49,15 @@ MainWindow::MainWindow(QWidget* parent)
     auto* commGroupLayout = new QVBoxLayout(m_commGroup);
     commGroupLayout->addWidget(m_commWidget);
 
-    m_sendingGroup = new QGroupBox(central);
-    auto* sendingGroupLayout = new QVBoxLayout(m_sendingGroup);
-    sendingGroupLayout->addWidget(m_sendingWidget);
-
-    m_matchersGroup = new QGroupBox(central);
-    auto* matchersGroupLayout = new QVBoxLayout(m_matchersGroup);
-    matchersGroupLayout->addWidget(m_matchersWidget);
+    m_dataInteractionSection = new SectionWidget(tr("data interaction"), m_sendingWidget, central);
+    m_matcherSettingSection = new SectionWidget(tr("matcher setting"), m_matchersWidget, central);
+    m_lineChartSection = new SectionWidget(tr("line chart"), m_lineChartWidget, central);
 
     m_centralLayout->addWidget(m_profileWidget);
     m_centralLayout->addWidget(m_commGroup);
-    m_centralLayout->addWidget(m_sendingGroup);
-    m_centralLayout->addWidget(m_rawDataWidget);
-    m_centralLayout->addWidget(m_matchersGroup);
-    m_centralLayout->addWidget(m_lineChartWidget, 1);
+    m_centralLayout->addWidget(m_dataInteractionSection);
+    m_centralLayout->addWidget(m_matcherSettingSection);
+    m_centralLayout->addWidget(m_lineChartSection, 1);
     setCentralWidget(central);
 
     // Sending goes through the active channel.
@@ -90,16 +85,22 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onFrameMatched);
     connect(m_pipeline, &MatcherPipeline::pickerValueChanged,
             this, &MainWindow::onPickerValueChanged);
-    connect(m_sendingWidget, &SendingWidget::sendRequested,
-            this, &MainWindow::onSendRequested);
-    connect(m_sendingWidget, &SendingWidget::stopRequested, this, [this]() {
-        m_dataSender->stopLoop();
-        m_sendingWidget->setLooping(false);
-    });
     connect(m_matchersWidget, &MatchersWidget::matchersChanged,
             this, &MainWindow::onMatchersChanged);
-    connect(m_lineChartWidget, &LineChartWidget::maximizeRequested,
-            this, &MainWindow::onChartMaximize);
+
+    connect(m_dataInteractionSection, &SectionWidget::maximizeRequested,
+            this, [this]() { maximizeSection(m_dataInteractionSection); });
+    connect(m_matcherSettingSection, &SectionWidget::maximizeRequested,
+            this, [this]() { maximizeSection(m_matcherSettingSection); });
+    connect(m_lineChartSection, &SectionWidget::maximizeRequested,
+            this, [this]() { maximizeSection(m_lineChartSection); });
+
+    connect(m_dataInteractionSection, &SectionWidget::restoreRequested,
+            this, &MainWindow::restoreSections);
+    connect(m_matcherSettingSection, &SectionWidget::restoreRequested,
+            this, &MainWindow::restoreSections);
+    connect(m_lineChartSection, &SectionWidget::restoreRequested,
+            this, &MainWindow::restoreSections);
 
     m_sendingWidget->setConnected(false);
     rebuildChartSeries();
@@ -124,8 +125,6 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onAnyChange);
     connect(m_dataSender, &DataSender::historyChanged,
             this, &MainWindow::onAnyChange);
-    connect(m_rawDataWidget, &RawDataWidget::settingsChanged,
-            this, &MainWindow::onAnyChange);
     connect(m_sendingWidget, &SendingWidget::settingsChanged,
             this, &MainWindow::onAnyChange);
 
@@ -139,7 +138,8 @@ void MainWindow::onConnectRequested()
 {
     m_byteCache->setCapacity(m_commWidget->byteCacheSize());
     m_byteCache->clear();
-    m_rawDataWidget->clear();
+    m_sendingWidget->clearReceivedData();
+    m_sendingWidget->clearSendPreview();
 
     switch (m_commWidget->mode()) {
     case ChannelMode::Serial:
@@ -178,7 +178,7 @@ void MainWindow::onChannelStateChanged(bool open)
 void MainWindow::onBytesReceived(const QByteArray& data)
 {
     m_byteCache->append(data);
-    m_rawDataWidget->appendBytes(data);
+    m_sendingWidget->appendReceivedBytes(data);
 }
 
 void MainWindow::onDrainCache()
@@ -202,22 +202,6 @@ void MainWindow::onPickerValueChanged(int matcherIndex, int pickerIndex,
     const auto it = m_pickerToSeries.constFind(key);
     if (it != m_pickerToSeries.constEnd() && valid)
         m_lineChartWidget->appendValue(it.value(), value.toDouble());
-}
-
-void MainWindow::onSendRequested(const QByteArray& data, bool loop, int intervalMs)
-{
-    if (!m_channelManager->isOpen()) {
-        QMessageBox::warning(this, tr("Not connected"),
-                             tr("Please connect to a device first."));
-        return;
-    }
-
-    if (loop) {
-        m_dataSender->startLoop(data, intervalMs);
-        m_sendingWidget->setLooping(true);
-    } else {
-        m_dataSender->sendOnce(data);
-    }
 }
 
 void MainWindow::onMatchersChanged()
@@ -275,8 +259,12 @@ void MainWindow::loadRecentData()
     m_commWidget->setTcpServerConfig(server);
 
     m_commWidget->setByteCacheSize(m_state.byteCacheSize);
-    m_rawDataWidget->setMaxBytes(m_state.rawDataBytes);
+    m_sendingWidget->setRawDataMaxBytes(m_state.rawDataBytes);
     m_sendingWidget->setIntervalMs(m_state.loopIntervalMs);
+    m_sendingWidget->setStrategyType(static_cast<SendStrategyType>(m_state.sendStrategy));
+    m_sendingWidget->setCrcAlgorithm(static_cast<CrcAlgorithm>(m_state.sendCrcAlgorithm));
+    m_sendingWidget->setFieldSpec(m_state.fieldSpec);
+    m_sendingWidget->setFieldSpecHistory(m_state.fieldSpecHistory);
 
     m_dataSender->setHistory(m_state.sendHistory);
     m_matchersWidget->setKeywordHistory(m_state.keywordHistory);
@@ -300,8 +288,12 @@ void MainWindow::saveRecentData()
     m_state.serverInterface = server.listenAddress.toString();
     m_state.serverPort = server.port;
     m_state.byteCacheSize = m_commWidget->byteCacheSize();
-    m_state.rawDataBytes = m_rawDataWidget->maxBytes();
+    m_state.rawDataBytes = m_sendingWidget->rawDataMaxBytes();
     m_state.loopIntervalMs = m_sendingWidget->intervalMs();
+    m_state.sendStrategy = static_cast<int>(m_sendingWidget->strategyType());
+    m_state.sendCrcAlgorithm = static_cast<int>(m_sendingWidget->crcAlgorithm());
+    m_state.fieldSpec = m_sendingWidget->fieldSpec();
+    m_state.fieldSpecHistory = m_sendingWidget->fieldSpecHistory();
 
     m_state.sendHistory = m_dataSender->history();
     m_state.keywordHistory = m_matchersWidget->keywordHistory();
@@ -309,21 +301,35 @@ void MainWindow::saveRecentData()
     RecentDataStore::save(m_state);
 }
 
-void MainWindow::onChartMaximize(bool maximize)
+void MainWindow::maximizeSection(SectionWidget* section)
 {
-    m_profileWidget->setVisible(!maximize);
-    m_commGroup->setVisible(!maximize);
-    m_sendingGroup->setVisible(!maximize);
-    m_rawDataWidget->setVisible(!maximize);
-    m_matchersGroup->setVisible(!maximize);
+    const QList<SectionWidget*> sections = {
+        m_dataInteractionSection, m_matcherSettingSection, m_lineChartSection
+    };
 
-    if (maximize) {
-        m_centralLayout->setContentsMargins(0, 0, 0, 0);
-        statusBar()->hide();
-    } else {
-        m_centralLayout->unsetContentsMargins();
-        statusBar()->show();
+    // Non-section widgets have no title bar to fold into, so hide them.
+    m_profileWidget->setVisible(false);
+    m_commGroup->setVisible(false);
+
+    for (SectionWidget* s : sections) {
+        const bool current = (s == section);
+        s->setCollapsed(!current);
+        m_centralLayout->setStretchFactor(s, current ? 1 : 0);
     }
+}
+
+void MainWindow::restoreSections()
+{
+    m_profileWidget->setVisible(true);
+    m_commGroup->setVisible(true);
+
+    m_dataInteractionSection->setCollapsed(false);
+    m_matcherSettingSection->setCollapsed(false);
+    m_lineChartSection->setCollapsed(false);
+
+    m_centralLayout->setStretchFactor(m_dataInteractionSection, 0);
+    m_centralLayout->setStretchFactor(m_matcherSettingSection, 0);
+    m_centralLayout->setStretchFactor(m_lineChartSection, 1);
 }
 
 void MainWindow::onChannelError(const QString& message)
@@ -387,7 +393,7 @@ QJsonObject MainWindow::buildState() const
     comm.insert(QStringLiteral("serverInterface"), server.listenAddress.toString());
     comm.insert(QStringLiteral("serverPort"), server.port);
     comm.insert(QStringLiteral("byteCacheSize"), m_commWidget->byteCacheSize());
-    comm.insert(QStringLiteral("rawDataBytes"), m_rawDataWidget->maxBytes());
+    comm.insert(QStringLiteral("rawDataBytes"), m_sendingWidget->rawDataMaxBytes());
     comm.insert(QStringLiteral("loopIntervalMs"), m_sendingWidget->intervalMs());
 
     QJsonArray sendArr;
@@ -398,9 +404,17 @@ QJsonObject MainWindow::buildState() const
     for (const QString& text : m_matchersWidget->keywordHistory())
         keywordArr.append(text);
 
+    QJsonArray fieldSpecArr;
+    for (const QString& text : m_sendingWidget->fieldSpecHistory())
+        fieldSpecArr.append(text);
+
     QJsonObject root;
     root.insert(QStringLiteral("comm"), comm);
     root.insert(QStringLiteral("matchers"), m_matchersWidget->matchersToJson());
+    root.insert(QStringLiteral("sendStrategy"), static_cast<int>(m_sendingWidget->strategyType()));
+    root.insert(QStringLiteral("sendCrcAlgorithm"), static_cast<int>(m_sendingWidget->crcAlgorithm()));
+    root.insert(QStringLiteral("fieldSpec"), m_sendingWidget->fieldSpec());
+    root.insert(QStringLiteral("fieldSpecHistory"), fieldSpecArr);
     root.insert(QStringLiteral("sendHistory"), sendArr);
     root.insert(QStringLiteral("keywordHistory"), keywordArr);
     return root;
@@ -435,7 +449,7 @@ void MainWindow::applyState(const QJsonObject& root)
     m_commWidget->setTcpServerConfig(server);
 
     m_commWidget->setByteCacheSize(comm.value(QStringLiteral("byteCacheSize")).toInt(10000));
-    m_rawDataWidget->setMaxBytes(comm.value(QStringLiteral("rawDataBytes")).toInt(2000));
+    m_sendingWidget->setRawDataMaxBytes(comm.value(QStringLiteral("rawDataBytes")).toInt(2000));
     m_sendingWidget->setIntervalMs(comm.value(QStringLiteral("loopIntervalMs")).toInt(1000));
 
     QStringList sendHistory;
@@ -449,6 +463,18 @@ void MainWindow::applyState(const QJsonObject& root)
     for (const auto& value : keywordArr)
         keywordHistory.append(value.toString());
     m_matchersWidget->setKeywordHistory(keywordHistory);
+
+    m_sendingWidget->setStrategyType(static_cast<SendStrategyType>(
+        root.value(QStringLiteral("sendStrategy")).toInt(0)));
+    m_sendingWidget->setCrcAlgorithm(static_cast<CrcAlgorithm>(
+        root.value(QStringLiteral("sendCrcAlgorithm")).toInt(0)));
+    m_sendingWidget->setFieldSpec(root.value(QStringLiteral("fieldSpec")).toString());
+
+    QStringList fieldSpecHistory;
+    const QJsonArray fieldSpecArr = root.value(QStringLiteral("fieldSpecHistory")).toArray();
+    for (const auto& value : fieldSpecArr)
+        fieldSpecHistory.append(value.toString());
+    m_sendingWidget->setFieldSpecHistory(fieldSpecHistory);
 
     m_matchersWidget->applyMatchersJson(root.value(QStringLiteral("matchers")).toArray());
 
