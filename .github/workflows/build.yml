@@ -41,6 +41,15 @@ jobs:
           arch: ${{ matrix.arch }}
           cache: true
 
+      # Qt 6.8.1's FindWrapOpenGL.cmake falls back to the AGL framework, which
+      # was removed in newer macOS. Drop that fallback (this app doesn't use it).
+      - name: Patch Qt (remove AGL fallback)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          sed -i '' -e '/-framework AGL/d' -e '/__opengl_agl_fw_path}/d' \
+            "$QT_ROOT_DIR/lib/cmake/Qt6/FindWrapOpenGL.cmake"
+
       - name: Configure (Linux)
         if: runner.os == 'Linux'
         shell: bash
