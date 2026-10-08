@@ -65,12 +65,10 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       # ---- Packaging ----
-      - name: Package Windows (portable zip)
+      - name: Package Windows (portable)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          windeployqt --release build/Release/comm-sampling.exe
-          Compress-Archive -Path build/Release/* -DestinationPath comm-sampling-windows-x64.zip
+        run: windeployqt --release build/Release/comm-sampling.exe
 
       - name: Package macOS (dmg)
         if: runner.os == 'macOS'
@@ -99,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: comm-sampling-windows-x64
-          path: comm-sampling-windows-x64.zip
+          path: build/Release/**
 
       - name: Upload (macOS)
         if: runner.os == 'macOS'
@@ -127,7 +125,16 @@ jobs:
         with:
           path: artifacts
 
+      - name: Repackage Windows zip
+        run: |
+          cd artifacts/comm-sampling-windows-x64
+          zip -r ../../comm-sampling-windows-x64.zip .
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            comm-sampling-windows-x64.zip
+            artifacts/comm-sampling-macos-arm64/*.dmg
+            artifacts/comm-sampling-macos-x86_64/*.dmg
+            artifacts/comm-sampling-linux/*.AppImage
