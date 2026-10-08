@@ -18,9 +18,11 @@ jobs:
           - os: windows-latest
             name: windows
             arch: ''
+          # Qt 6.8.1 macOS binaries are universal and published only under the
+          # `clang_64` arch (no separate clang_arm64). Build both slices from it.
           - os: macos-latest
             name: macos-arm64
-            arch: clang_arm64
+            arch: clang_64
             cmake_arch: arm64
           - os: macos-15-intel
             name: macos-x86_64
@@ -83,13 +85,13 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
-          wget -q -O linuxdeploy "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-          wget -q -O linuxdeploy-plugin-qt "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
-          chmod +x linuxdeploy linuxdeploy-plugin-qt
+          wget -q -O linuxdeploy-x86_64.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          wget -q -O linuxdeploy-plugin-qt.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt.AppImage
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
-          ./linuxdeploy --appdir AppDir -e build/comm-sampling \
+          export OUTPUT=comm-sampling-linux-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir -e build/comm-sampling \
             -d packaging/comm-sampling.desktop --plugin qt --output appimage
-          mv "$(ls *.AppImage | head -1)" comm-sampling-linux-x86_64.AppImage
 
       # ---- Upload ----
       - name: Upload (Windows)
