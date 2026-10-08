@@ -94,6 +94,11 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
+          # linuxdeploy-plugin-qt recurses forever on Qt 6.8's Wayland libs;
+          # this is an xcb app, so drop Wayland to break the loop.
+          rm -rf "$QT_ROOT_DIR/plugins"/wayland-*
+          rm -f "$QT_ROOT_DIR/lib"/libQt6Wayland*.so*
+
           wget -q -O linuxdeploy-x86_64.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
           wget -q -O linuxdeploy-plugin-qt.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt.AppImage
