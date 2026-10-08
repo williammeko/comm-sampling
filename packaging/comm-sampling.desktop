@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Comm Sampling
+Exec=comm-sampling
+Icon=comm-sampling
+Categories=Utility;Development;
+Comment=Device communication sampling tool
