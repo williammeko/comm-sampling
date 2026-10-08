@@ -105,7 +105,8 @@ jobs:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           export OUTPUT=comm-sampling-linux-x86_64.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e build/comm-sampling \
-            -d packaging/comm-sampling.desktop --plugin qt --output appimage
+            -d packaging/comm-sampling.desktop -i packaging/comm-sampling.svg \
+            --plugin qt --output appimage
 
       # ---- Upload ----
       - name: Upload (Windows)
