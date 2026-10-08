@@ -22,7 +22,7 @@ jobs:
             name: macos-arm64
             arch: clang_arm64
             cmake_arch: arm64
-          - os: macos-latest
+          - os: macos-15-intel
             name: macos-x86_64
             arch: clang_64
             cmake_arch: x86_64
