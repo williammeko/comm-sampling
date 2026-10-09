@@ -42,7 +42,13 @@ QString formatValue(double v)
 {
     if (v == std::floor(v) && std::abs(v) < 1e15)
         return QString::number(static_cast<qint64>(v));
-    return QString::number(v, 'g', 6);
+
+    QString text = QString::number(v, 'f', 6);
+    while (text.endsWith(QLatin1Char('0')))
+        text.chop(1);
+    if (text.endsWith(QLatin1Char('.')))
+        text.chop(1);
+    return text;
 }
 
 } // namespace
@@ -206,7 +212,7 @@ protected:
             painter.setPen(Qt::black);
             painter.drawText(QRect(0, y - 8, area.left() - 6, 16),
                              Qt::AlignRight | Qt::AlignVCenter,
-                             QString::number(v, 'g', 4));
+                             QString::number(v, 'f', 4));
         }
 
         // X axis time labels (relative ms, zero-padded), as many as fit.
@@ -219,7 +225,7 @@ protected:
             painter.setPen(Qt::black);
             for (double ms = 0.0; ms <= spanMs + stepMs * 0.5; ms += stepMs) {
                 const double t = tMin + ms / 1000.0;
-                const int x = qRound(tx(t));
+                const int x = qBound(area.left(), qRound(tx(t)), area.right());
                 painter.drawLine(x, area.bottom(), x, area.bottom() + 4);
                 painter.drawText(QRect(x - 40, area.bottom() + 4, 80, 16),
                                  Qt::AlignHCenter | Qt::AlignTop,
@@ -365,7 +371,7 @@ private:
         bool visible = true;
     };
 
-    QRect plotArea() const { return rect().adjusted(56, 24, -12, -28); }
+    QRect plotArea() const { return rect().adjusted(96, 24, -48, -28); }
 
     qint64 effectiveElapsedMs() const
     {
