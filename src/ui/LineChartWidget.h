@@ -35,10 +35,12 @@ private:
 
     QSpinBox* m_durationSpin = nullptr;
     QCheckBox* m_showValuesCheck = nullptr;
+    QPushButton* m_pauseButton = nullptr;
     QHBoxLayout* m_checksLayout = nullptr;
     QList<QCheckBox*> m_seriesChecks;
     class ChartCanvas* m_canvas = nullptr;
     bool m_enabled = false;
+    bool m_paused = false;
 };
 
 } // namespace comm

@@ -3,12 +3,14 @@
 #include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPointF>
 #include <QPolygonF>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 #include <QtGlobal>
 
@@ -66,10 +68,13 @@ public:
 
     void appendValue(int seriesIndex, double value)
     {
+        if (m_paused)
+            return;
+
         if (seriesIndex < 0 || seriesIndex >= m_series.size())
             return;
 
-        const double t = m_clock.elapsed() / 1000.0;
+        const double t = nowSeconds();
         m_series[seriesIndex].points.append({t, value});
         prune(nowSeconds());
     }
@@ -91,6 +96,30 @@ public:
     void setDuration(int ms) { m_durationMs = qMax(10, ms); }
     int duration() const { return m_durationMs; }
 
+    void setPaused(bool paused)
+    {
+        if (paused == m_paused)
+            return;
+
+        if (paused) {
+            const double now = (m_clock.elapsed() - m_pausedOffsetMs) / 1000.0;
+            prune(now);
+            m_viewTMin = now - m_durationMs / 1000.0;
+            m_viewTMax = now;
+            m_hasView = true;
+            m_pauseStartMs = m_clock.elapsed();
+            m_paused = true;
+        } else {
+            m_pausedOffsetMs += m_clock.elapsed() - m_pauseStartMs;
+            m_paused = false;
+            m_hasView = false;
+            m_panning = false;
+        }
+        update();
+    }
+
+    bool isPaused() const { return m_paused; }
+
     void clearChart()
     {
         for (SeriesData& s : m_series)
@@ -109,7 +138,7 @@ protected:
         const double now = nowSeconds();
         prune(now);
 
-        const QRect area = rect().adjusted(56, 24, -12, -28);
+        const QRect area = plotArea();
         if (area.width() <= 0 || area.height() <= 0)
             return;
 
@@ -128,33 +157,20 @@ protected:
             return;
         }
 
-        const double tMin = now - m_durationMs / 1000.0;
-        const double tMax = now;
-
-        // Auto-scale Y across all series.
-        double vMin = 0.0;
-        double vMax = 0.0;
-        bool first = true;
-        for (const SeriesData& s : m_series) {
-            for (const Point& pt : s.points) {
-                if (first) {
-                    vMin = vMax = pt.v;
-                    first = false;
-                } else {
-                    vMin = qMin(vMin, pt.v);
-                    vMax = qMax(vMax, pt.v);
-                }
-            }
-        }
-
-        if (vMin == vMax) {
-            vMin -= 1.0;
-            vMax += 1.0;
+        double tMin;
+        double tMax;
+        if (m_paused && m_hasView) {
+            tMin = m_viewTMin;
+            tMax = m_viewTMax;
         } else {
-            const double pad = (vMax - vMin) * 0.1;
-            vMin -= pad;
-            vMax += pad;
+            tMin = now - m_durationMs / 1000.0;
+            tMax = now;
         }
+
+        // Auto-adapt Y to the data visible in the current time window.
+        double vMin;
+        double vMax;
+        computeValueRange(tMin, tMax, vMin, vMax);
 
         const auto tx = [&](double t) {
             return area.left() + (t - tMin) / (tMax - tMin) * area.width();
@@ -235,6 +251,73 @@ protected:
         }
     }
 
+    void wheelEvent(QWheelEvent* event) override
+    {
+        if (!m_paused || !m_hasView) {
+            QWidget::wheelEvent(event);
+            return;
+        }
+
+        const QRect area = plotArea();
+        if (area.width() <= 0 || area.height() <= 0) {
+            event->ignore();
+            return;
+        }
+
+        const QPointF pos = event->position();
+        const double factor = (event->angleDelta().y() > 0) ? 0.8 : 1.25;
+        const double tFrac = qBound(0.0, (pos.x() - area.left()) / double(area.width()), 1.0);
+        const double tAtCursor = m_viewTMin + tFrac * (m_viewTMax - m_viewTMin);
+        const double newTSpan = (m_viewTMax - m_viewTMin) * factor;
+        m_viewTMin = tAtCursor - tFrac * newTSpan;
+        m_viewTMax = m_viewTMin + newTSpan;
+
+        update();
+        event->accept();
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (m_paused && m_hasView && event->button() == Qt::LeftButton) {
+            m_panning = true;
+            m_panStart = event->position();
+            m_panStartTMin = m_viewTMin;
+            m_panStartTMax = m_viewTMax;
+            event->accept();
+            return;
+        }
+        QWidget::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (!m_panning) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+
+        const QRect area = plotArea();
+        if (area.width() <= 0)
+            return;
+
+        const double deltaX = event->position().x() - m_panStart.x();
+        const double dt = -deltaX / double(area.width()) * (m_panStartTMax - m_panStartTMin);
+        m_viewTMin = m_panStartTMin + dt;
+        m_viewTMax = m_panStartTMax + dt;
+        update();
+        event->accept();
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override
+    {
+        if (m_panning && event->button() == Qt::LeftButton) {
+            m_panning = false;
+            event->accept();
+            return;
+        }
+        QWidget::mouseReleaseEvent(event);
+    }
+
 private:
     struct Point {
         double t;
@@ -248,7 +331,16 @@ private:
         bool visible = true;
     };
 
-    double nowSeconds() const { return m_clock.elapsed() / 1000.0; }
+    QRect plotArea() const { return rect().adjusted(56, 24, -12, -28); }
+
+    qint64 effectiveElapsedMs() const
+    {
+        if (m_paused)
+            return m_pauseStartMs - m_pausedOffsetMs;
+        return m_clock.elapsed() - m_pausedOffsetMs;
+    }
+
+    double nowSeconds() const { return effectiveElapsedMs() / 1000.0; }
 
     void prune(double now)
     {
@@ -259,11 +351,53 @@ private:
         }
     }
 
+    void computeValueRange(double tMin, double tMax, double& vMin, double& vMax) const
+    {
+        vMin = 0.0;
+        vMax = 0.0;
+        bool first = true;
+        for (const SeriesData& s : m_series) {
+            for (const Point& pt : s.points) {
+                if (pt.t < tMin || pt.t > tMax)
+                    continue;
+                if (first) {
+                    vMin = vMax = pt.v;
+                    first = false;
+                } else {
+                    vMin = qMin(vMin, pt.v);
+                    vMax = qMax(vMax, pt.v);
+                }
+            }
+        }
+
+        if (vMin == vMax) {
+            vMin -= 1.0;
+            vMax += 1.0;
+        } else {
+            const double pad = (vMax - vMin) * 0.1;
+            vMin -= pad;
+            vMax += pad;
+        }
+    }
+
     QList<SeriesData> m_series;
     QElapsedTimer m_clock;
     QTimer m_repaintTimer;
     int m_durationMs = 1000;
     bool m_showValues = true;
+
+    bool m_paused = false;
+    qint64 m_pauseStartMs = 0;
+    qint64 m_pausedOffsetMs = 0;
+
+    bool m_hasView = false;
+    double m_viewTMin = 0.0;
+    double m_viewTMax = 0.0;
+
+    bool m_panning = false;
+    QPointF m_panStart;
+    double m_panStartTMin = 0.0;
+    double m_panStartTMax = 0.0;
 };
 
 LineChartWidget::LineChartWidget(QWidget* parent)
@@ -282,6 +416,8 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     m_durationSpin->setValue(1000);
     m_durationSpin->setSuffix(tr(" ms"));
     topRow->addWidget(m_durationSpin);
+    m_pauseButton = new QPushButton(tr("Pause"), this);
+    topRow->addWidget(m_pauseButton);
     layout->addLayout(topRow);
 
     m_checksLayout = new QHBoxLayout;
@@ -297,6 +433,11 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     });
     connect(m_showValuesCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_canvas->setShowValues(checked);
+    });
+    connect(m_pauseButton, &QPushButton::clicked, this, [this]() {
+        m_paused = !m_paused;
+        m_pauseButton->setText(m_paused ? tr("Resume") : tr("Pause"));
+        m_canvas->setPaused(m_paused);
     });
 
     setEnabledState(false);
