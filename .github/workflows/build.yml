@@ -33,6 +33,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev-${GITHUB_SHA:0:8}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -86,7 +96,7 @@ jobs:
         shell: bash
         run: |
           macdeployqt build/comm-sampling.app -dmg
-          mv build/comm-sampling.dmg comm-sampling-${{ matrix.name }}.dmg
+          mv build/comm-sampling.dmg comm-sampling-${{ matrix.name }}-${{ steps.version.outputs.value }}.dmg
 
       - name: Package Linux (AppImage)
         if: runner.os == 'Linux'
@@ -103,7 +113,7 @@ jobs:
           wget -q -O linuxdeploy-plugin-qt.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt.AppImage
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
-          export OUTPUT=comm-sampling-linux-x86_64.AppImage
+          export OUTPUT=comm-sampling-linux-x86_64-${{ steps.version.outputs.value }}.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir -e build/comm-sampling \
             -d packaging/comm-sampling.desktop -i packaging/comm-sampling.svg \
             --plugin qt --output appimage
@@ -113,22 +123,22 @@ jobs:
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: comm-sampling-windows-x64
+          name: comm-sampling-windows-x64-${{ steps.version.outputs.value }}
           path: build/Release/**
 
       - name: Upload (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: comm-sampling-${{ matrix.name }}
-          path: comm-sampling-${{ matrix.name }}.dmg
+          name: comm-sampling-${{ matrix.name }}-${{ steps.version.outputs.value }}
+          path: comm-sampling-${{ matrix.name }}-${{ steps.version.outputs.value }}.dmg
 
       - name: Upload (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: comm-sampling-linux
-          path: comm-sampling-linux-x86_64.AppImage
+          name: comm-sampling-linux-${{ steps.version.outputs.value }}
+          path: comm-sampling-linux-x86_64-${{ steps.version.outputs.value }}.AppImage
 
   release:
     needs: package
@@ -137,6 +147,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev-${GITHUB_SHA:0:8}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -144,14 +164,14 @@ jobs:
 
       - name: Repackage Windows zip
         run: |
-          cd artifacts/comm-sampling-windows-x64
-          zip -r ../../comm-sampling-windows-x64.zip .
+          cd artifacts/comm-sampling-windows-x64-${{ steps.version.outputs.value }}
+          zip -r ../../comm-sampling-windows-x64-${{ steps.version.outputs.value }}.zip .
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            comm-sampling-windows-x64.zip
-            artifacts/comm-sampling-macos-arm64/*.dmg
-            artifacts/comm-sampling-macos-x86_64/*.dmg
-            artifacts/comm-sampling-linux/*.AppImage
+            comm-sampling-windows-x64-${{ steps.version.outputs.value }}.zip
+            artifacts/comm-sampling-macos-arm64-${{ steps.version.outputs.value }}/*.dmg
+            artifacts/comm-sampling-macos-x86_64-${{ steps.version.outputs.value }}/*.dmg
+            artifacts/comm-sampling-linux-${{ steps.version.outputs.value }}/*.AppImage
