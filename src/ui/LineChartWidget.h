@@ -11,6 +11,7 @@ class QSpinBox;
 class QPushButton;
 class QCheckBox;
 class QHBoxLayout;
+class QLabel;
 
 namespace comm {
 
@@ -30,6 +31,11 @@ public:
     int durationMs() const;
     void clearChart();
 
+    // Speed summary: raw bytes + per-matcher lines/values per second.
+    void setSpeedMatchers(const QList<bool>& isPicker);
+    void setRawSpeed(double kbps);
+    void setMatcherSpeed(int index, double rate);
+
 private:
     void rebuildSeriesChecks(const QList<SeriesInfo>& series);
 
@@ -41,6 +47,11 @@ private:
     class ChartCanvas* m_canvas = nullptr;
     bool m_enabled = false;
     bool m_paused = false;
+
+    QLabel* m_rawSpeedLabel = nullptr;
+    QHBoxLayout* m_speedLayout = nullptr;
+    QList<QLabel*> m_speedLabels;
+    QList<bool> m_speedIsPicker;
 };
 
 } // namespace comm

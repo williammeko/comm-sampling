@@ -71,6 +71,12 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_drainTimer, &QTimer::timeout, this, &MainWindow::onDrainCache);
     m_drainTimer->start();
 
+    m_statsTimer = new QTimer(this);
+    m_statsTimer->setInterval(1000);
+    connect(m_statsTimer, &QTimer::timeout, this, &MainWindow::updateStats);
+    m_statsTimer->start();
+    m_statsClock.start();
+
     connect(m_commWidget, &CommunicationSettingsWidget::connectRequested,
             this, &MainWindow::onConnectRequested);
     connect(m_commWidget, &CommunicationSettingsWidget::disconnectRequested,
@@ -179,6 +185,7 @@ void MainWindow::onBytesReceived(const QByteArray& data)
 {
     m_byteCache->append(data);
     m_sendingWidget->appendReceivedBytes(data);
+    m_rawBytes += static_cast<quint64>(data.size());
 }
 
 void MainWindow::onDrainCache()
@@ -191,12 +198,15 @@ void MainWindow::onDrainCache()
 void MainWindow::onFrameMatched(int matcherIndex, const QByteArray& frame)
 {
     m_matchersWidget->showFrame(matcherIndex, frame);
+    m_frameCounts[matcherIndex] += 1;
 }
 
 void MainWindow::onPickerValueChanged(int matcherIndex, int pickerIndex,
                                       const QVariant& value, bool valid)
 {
     m_matchersWidget->updatePickerValue(matcherIndex, pickerIndex, value, valid);
+
+    m_valueCounts[matcherIndex] += 1;
 
     const int key = matcherIndex * 10000 + pickerIndex;
     const auto it = m_pickerToSeries.constFind(key);
@@ -208,6 +218,27 @@ void MainWindow::onMatchersChanged()
 {
     m_pipeline->setMatchers(m_matchersWidget->matchers());
     rebuildChartSeries();
+}
+
+void MainWindow::updateStats()
+{
+    const double dt = m_statsClock.restart() / 1000.0;
+    if (dt <= 0.0)
+        return;
+
+    m_lineChartWidget->setRawSpeed((m_rawBytes / dt) / 1024.0);
+    m_rawBytes = 0;
+
+    const QList<Matcher*> matchers = m_matchersWidget->matchers();
+    for (int i = 0; i < matchers.size(); ++i) {
+        const bool isPicker = (matchers.at(i)->type() == Matcher::Type::DecimalPicker);
+        const double rate = isPicker ? (m_valueCounts.value(i, 0) / dt)
+                                     : (m_frameCounts.value(i, 0) / dt);
+        m_lineChartWidget->setMatcherSpeed(i, rate);
+    }
+
+    m_frameCounts.clear();
+    m_valueCounts.clear();
 }
 
 void MainWindow::rebuildChartSeries()
@@ -231,6 +262,14 @@ void MainWindow::rebuildChartSeries()
 
     m_lineChartWidget->setSeries(m_series);
     m_lineChartWidget->setEnabledState(!m_series.isEmpty());
+
+    QList<bool> isPicker;
+    for (const Matcher* matcher : matchers)
+        isPicker.append(matcher->type() == Matcher::Type::DecimalPicker);
+    m_lineChartWidget->setSpeedMatchers(isPicker);
+
+    m_frameCounts.clear();
+    m_valueCounts.clear();
 }
 
 void MainWindow::loadRecentData()

@@ -22,6 +22,22 @@ namespace {
 
 constexpr double kMinLabelDistance = 48.0;
 
+double niceStepMs(double raw)
+{
+    if (raw <= 0.0)
+        return 1.0;
+    const double mag = std::pow(10.0, std::floor(std::log10(raw)));
+    const double norm = raw / mag;
+    double step = 10.0;
+    if (norm <= 1.0)
+        step = 1.0;
+    else if (norm <= 2.0)
+        step = 2.0;
+    else if (norm <= 5.0)
+        step = 5.0;
+    return step * mag;
+}
+
 QString formatValue(double v)
 {
     if (v == std::floor(v) && std::abs(v) < 1e15)
@@ -191,6 +207,24 @@ protected:
             painter.drawText(QRect(0, y - 8, area.left() - 6, 16),
                              Qt::AlignRight | Qt::AlignVCenter,
                              QString::number(v, 'g', 4));
+        }
+
+        // X axis time labels (relative ms, zero-padded), as many as fit.
+        {
+            const double spanMs = (tMax - tMin) * 1000.0;
+            const double rawStep = spanMs * 60.0 / area.width();
+            const double stepMs = niceStepMs(rawStep);
+            const int digits = QString::number(qCeil(spanMs)).size();
+
+            painter.setPen(Qt::black);
+            for (double ms = 0.0; ms <= spanMs + stepMs * 0.5; ms += stepMs) {
+                const double t = tMin + ms / 1000.0;
+                const int x = qRound(tx(t));
+                painter.drawLine(x, area.bottom(), x, area.bottom() + 4);
+                painter.drawText(QRect(x - 40, area.bottom() + 4, 80, 16),
+                                 Qt::AlignHCenter | Qt::AlignTop,
+                                 QStringLiteral("%1").arg(qRound(ms), digits, 10, QLatin1Char('0')));
+            }
         }
 
         // Draw each visible series in its own color, plus value labels.
@@ -410,6 +444,13 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     m_showValuesCheck->setChecked(true);
     topRow->addWidget(m_showValuesCheck);
     topRow->addStretch(1);
+
+    m_speedLayout = new QHBoxLayout;
+    m_speedLayout->setSpacing(8);
+    m_rawSpeedLabel = new QLabel(tr("Raw data: 0.0 kb/s"), this);
+    m_speedLayout->addWidget(m_rawSpeedLabel);
+    topRow->addLayout(m_speedLayout);
+
     topRow->addWidget(new QLabel(tr("Duration:")));
     m_durationSpin = new QSpinBox(this);
     m_durationSpin->setRange(10, 600000);
@@ -501,6 +542,39 @@ int LineChartWidget::durationMs() const
 void LineChartWidget::clearChart()
 {
     m_canvas->clearChart();
+}
+
+void LineChartWidget::setSpeedMatchers(const QList<bool>& isPicker)
+{
+    for (QLabel* label : m_speedLabels) {
+        m_speedLayout->removeWidget(label);
+        delete label;
+    }
+    m_speedLabels.clear();
+    m_speedIsPicker = isPicker;
+
+    for (int i = 0; i < isPicker.size(); ++i) {
+        auto* label = new QLabel(this);
+        m_speedLayout->addWidget(label);
+        m_speedLabels.append(label);
+        setMatcherSpeed(i, 0.0);
+    }
+}
+
+void LineChartWidget::setRawSpeed(double kbps)
+{
+    if (m_rawSpeedLabel)
+        m_rawSpeedLabel->setText(tr("Raw data: %1 kb/s").arg(kbps, 0, 'f', 1));
+}
+
+void LineChartWidget::setMatcherSpeed(int index, double rate)
+{
+    if (index < 0 || index >= m_speedLabels.size())
+        return;
+
+    const QString unit = m_speedIsPicker.at(index) ? tr("values/s") : tr("lines/s");
+    m_speedLabels.at(index)->setText(
+        tr("Matcher %1: %2 %3").arg(index + 1).arg(rate, 0, 'f', 1).arg(unit));
 }
 
 } // namespace comm

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
@@ -46,6 +47,7 @@ private slots:
     void onMatchersChanged();
     void onChannelError(const QString& message);
     void onAnyChange();
+    void updateStats();
     void onProfileLoad(const QString& name);
     void onProfileSave(const QString& name);
     void autosaveRecent();
@@ -72,6 +74,12 @@ private:
 
     QTimer* m_drainTimer = nullptr;
     QTimer* m_autosaveTimer = nullptr;
+    QTimer* m_statsTimer = nullptr;
+
+    QElapsedTimer m_statsClock;
+    quint64 m_rawBytes = 0;
+    QHash<int, quint64> m_frameCounts;
+    QHash<int, quint64> m_valueCounts;
 
     QVBoxLayout* m_centralLayout = nullptr;
     QGroupBox* m_commGroup = nullptr;
