@@ -133,6 +133,8 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onAnyChange);
     connect(m_sendingWidget, &SendingWidget::settingsChanged,
             this, &MainWindow::onAnyChange);
+    connect(m_lineChartWidget, &LineChartWidget::settingsChanged,
+            this, &MainWindow::onAnyChange);
 
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit,
             this, &MainWindow::saveRecentData);
@@ -304,6 +306,8 @@ void MainWindow::loadRecentData()
     m_sendingWidget->setCrcAlgorithm(static_cast<CrcAlgorithm>(m_state.sendCrcAlgorithm));
     m_sendingWidget->setFieldSpec(m_state.fieldSpec);
     m_sendingWidget->setFieldSpecHistory(m_state.fieldSpecHistory);
+    m_sendingWidget->setTemplateData(m_state.templateData);
+    m_lineChartWidget->setShowValues(m_state.showValues);
 
     m_dataSender->setHistory(m_state.sendHistory);
     m_matchersWidget->setKeywordHistory(m_state.keywordHistory);
@@ -333,6 +337,8 @@ void MainWindow::saveRecentData()
     m_state.sendCrcAlgorithm = static_cast<int>(m_sendingWidget->crcAlgorithm());
     m_state.fieldSpec = m_sendingWidget->fieldSpec();
     m_state.fieldSpecHistory = m_sendingWidget->fieldSpecHistory();
+    m_state.templateData = m_sendingWidget->templateData();
+    m_state.showValues = m_lineChartWidget->showValues();
 
     m_state.sendHistory = m_dataSender->history();
     m_state.keywordHistory = m_matchersWidget->keywordHistory();
@@ -447,6 +453,10 @@ QJsonObject MainWindow::buildState() const
     for (const QString& text : m_sendingWidget->fieldSpecHistory())
         fieldSpecArr.append(text);
 
+    QJsonArray seriesVisArr;
+    for (bool visible : m_lineChartWidget->seriesVisibility())
+        seriesVisArr.append(visible);
+
     QJsonObject root;
     root.insert(QStringLiteral("comm"), comm);
     root.insert(QStringLiteral("matchers"), m_matchersWidget->matchersToJson());
@@ -454,6 +464,9 @@ QJsonObject MainWindow::buildState() const
     root.insert(QStringLiteral("sendCrcAlgorithm"), static_cast<int>(m_sendingWidget->crcAlgorithm()));
     root.insert(QStringLiteral("fieldSpec"), m_sendingWidget->fieldSpec());
     root.insert(QStringLiteral("fieldSpecHistory"), fieldSpecArr);
+    root.insert(QStringLiteral("templateData"), m_sendingWidget->templateData());
+    root.insert(QStringLiteral("showValues"), m_lineChartWidget->showValues());
+    root.insert(QStringLiteral("seriesVisibility"), seriesVisArr);
     root.insert(QStringLiteral("sendHistory"), sendArr);
     root.insert(QStringLiteral("keywordHistory"), keywordArr);
     return root;
@@ -508,6 +521,7 @@ void MainWindow::applyState(const QJsonObject& root)
     m_sendingWidget->setCrcAlgorithm(static_cast<CrcAlgorithm>(
         root.value(QStringLiteral("sendCrcAlgorithm")).toInt(0)));
     m_sendingWidget->setFieldSpec(root.value(QStringLiteral("fieldSpec")).toString());
+    m_sendingWidget->setTemplateData(root.value(QStringLiteral("templateData")).toString());
 
     QStringList fieldSpecHistory;
     const QJsonArray fieldSpecArr = root.value(QStringLiteral("fieldSpecHistory")).toArray();
@@ -516,6 +530,14 @@ void MainWindow::applyState(const QJsonObject& root)
     m_sendingWidget->setFieldSpecHistory(fieldSpecHistory);
 
     m_matchersWidget->applyMatchersJson(root.value(QStringLiteral("matchers")).toArray());
+
+    m_lineChartWidget->setShowValues(root.value(QStringLiteral("showValues")).toBool(true));
+
+    QList<bool> seriesVis;
+    const QJsonArray seriesVisArr = root.value(QStringLiteral("seriesVisibility")).toArray();
+    for (const auto& value : seriesVisArr)
+        seriesVis.append(value.toBool(true));
+    m_lineChartWidget->setSeriesVisibility(seriesVis);
 
     m_loadingState = false;
 }

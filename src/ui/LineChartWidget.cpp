@@ -474,6 +474,7 @@ LineChartWidget::LineChartWidget(QWidget* parent)
     });
     connect(m_showValuesCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_canvas->setShowValues(checked);
+        emit settingsChanged();
     });
     connect(m_pauseButton, &QPushButton::clicked, this, [this]() {
         m_paused = !m_paused;
@@ -514,6 +515,7 @@ void LineChartWidget::rebuildSeriesChecks(const QList<SeriesInfo>& series)
         check->setStyleSheet(QStringLiteral("color: %1;").arg(series.at(i).color.name()));
         connect(check, &QCheckBox::toggled, this, [this, i](bool checked) {
             m_canvas->setSeriesVisible(i, checked);
+            emit settingsChanged();
         });
         m_seriesChecks.append(check);
         m_checksLayout->addWidget(check);
@@ -575,6 +577,31 @@ void LineChartWidget::setMatcherSpeed(int index, double rate)
     const QString unit = m_speedIsPicker.at(index) ? tr("values/s") : tr("lines/s");
     m_speedLabels.at(index)->setText(
         tr("Matcher %1: %2 %3").arg(index + 1).arg(rate, 0, 'f', 1).arg(unit));
+}
+
+bool LineChartWidget::showValues() const
+{
+    return m_showValuesCheck->isChecked();
+}
+
+void LineChartWidget::setShowValues(bool checked)
+{
+    m_showValuesCheck->setChecked(checked);
+}
+
+QList<bool> LineChartWidget::seriesVisibility() const
+{
+    QList<bool> states;
+    for (QCheckBox* check : m_seriesChecks)
+        states.append(check->isChecked());
+    return states;
+}
+
+void LineChartWidget::setSeriesVisibility(const QList<bool>& states)
+{
+    const int count = qMin(states.size(), m_seriesChecks.size());
+    for (int i = 0; i < count; ++i)
+        m_seriesChecks.at(i)->setChecked(states.at(i));
 }
 
 } // namespace comm

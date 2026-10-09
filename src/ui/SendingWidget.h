@@ -40,6 +40,9 @@ public:
     void setFieldSpec(const QString& spec);
     void setFieldSpecHistory(const QStringList& history);
 
+    QString templateData() const;
+    void setTemplateData(const QString& text);
+
     void appendReceivedBytes(const QByteArray& bytes);
     void clearReceivedData();
     void clearSendPreview();

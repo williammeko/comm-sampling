@@ -36,6 +36,15 @@ public:
     void setRawSpeed(double kbps);
     void setMatcherSpeed(int index, double rate);
 
+    // Checkbox state (persisted with profiles).
+    bool showValues() const;
+    void setShowValues(bool checked);
+    QList<bool> seriesVisibility() const;
+    void setSeriesVisibility(const QList<bool>& states);
+
+signals:
+    void settingsChanged();
+
 private:
     void rebuildSeriesChecks(const QList<SeriesInfo>& series);
 

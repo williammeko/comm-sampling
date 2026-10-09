@@ -38,6 +38,9 @@ public:
         QString fieldSpec;
         QStringList fieldSpecHistory;
 
+        QString templateData;
+        bool showValues = true;
+
         QStringList sendHistory;
         QStringList keywordHistory;
     };

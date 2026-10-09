@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QStandardPaths>
@@ -19,7 +20,7 @@ QString ProfileStore::filePath()
 
 namespace {
 
-bool readAll(QJsonObject& profiles)
+bool readAll(QJsonObject& profiles, QStringList& order)
 {
     QFile file(ProfileStore::filePath());
     if (!file.open(QIODevice::ReadOnly))
@@ -30,14 +31,25 @@ bool readAll(QJsonObject& profiles)
     if (error.error != QJsonParseError::NoError || !doc.isObject())
         return false;
 
-    profiles = doc.object().value(QStringLiteral("profiles")).toObject();
+    const QJsonObject root = doc.object();
+    profiles = root.value(QStringLiteral("profiles")).toObject();
+
+    order.clear();
+    const QJsonArray orderArr = root.value(QStringLiteral("order")).toArray();
+    for (const auto& value : orderArr)
+        order.append(value.toString());
     return true;
 }
 
-bool writeAll(const QJsonObject& profiles)
+bool writeAll(const QJsonObject& profiles, const QStringList& order)
 {
     QJsonObject root;
     root.insert(QStringLiteral("profiles"), profiles);
+
+    QJsonArray orderArr;
+    for (const QString& name : order)
+        orderArr.append(name);
+    root.insert(QStringLiteral("order"), orderArr);
 
     const QString path = ProfileStore::filePath();
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -54,18 +66,28 @@ bool writeAll(const QJsonObject& profiles)
 QStringList ProfileStore::names()
 {
     QJsonObject profiles;
-    readAll(profiles);
+    QStringList order;
+    readAll(profiles, order);
 
-    QStringList result = profiles.keys();
-    result.removeAll(RecentName);
-    result.sort(Qt::CaseInsensitive);
+    QStringList all = profiles.keys();
+    all.removeAll(RecentName);
+
+    // Most recently saved first, then the rest sorted alphabetically.
+    QStringList result;
+    for (const QString& name : order) {
+        if (all.removeAll(name) > 0)
+            result.append(name);
+    }
+    all.sort(Qt::CaseInsensitive);
+    result.append(all);
     return result;
 }
 
 bool ProfileStore::load(const QString& name, QJsonObject& out)
 {
     QJsonObject profiles;
-    if (!readAll(profiles))
+    QStringList order;
+    if (!readAll(profiles, order))
         return false;
     if (!profiles.contains(name))
         return false;
@@ -76,20 +98,28 @@ bool ProfileStore::load(const QString& name, QJsonObject& out)
 bool ProfileStore::save(const QString& name, const QJsonObject& data)
 {
     QJsonObject profiles;
-    readAll(profiles); // ignore failure; start fresh if missing
+    QStringList order;
+    readAll(profiles, order); // ignore failure; start fresh if missing
     profiles.insert(name, data);
-    return writeAll(profiles);
+
+    order.removeAll(name);
+    order.prepend(name);
+
+    return writeAll(profiles, order);
 }
 
 bool ProfileStore::remove(const QString& name)
 {
     QJsonObject profiles;
-    if (!readAll(profiles))
+    QStringList order;
+    if (!readAll(profiles, order))
         return false;
     if (!profiles.contains(name))
         return false;
+
     profiles.remove(name);
-    return writeAll(profiles);
+    order.removeAll(name);
+    return writeAll(profiles, order);
 }
 
 } // namespace comm

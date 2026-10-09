@@ -306,6 +306,16 @@ void SendingWidget::setFieldSpecHistory(const QStringList& history)
     refreshFieldSpecItems();
 }
 
+QString SendingWidget::templateData() const
+{
+    return m_inputCombo->currentText().trimmed();
+}
+
+void SendingWidget::setTemplateData(const QString& text)
+{
+    m_inputCombo->setEditText(text);
+}
+
 void SendingWidget::appendReceivedBytes(const QByteArray& bytes)
 {
     if (m_rawDataWidget)
