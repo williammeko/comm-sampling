@@ -70,10 +70,15 @@ SendingWidget::SendingWidget(DataSender* sender, QWidget* parent)
     m_crcCombo->addItem(tr("non-crc"), static_cast<int>(CrcAlgorithm::None));
     m_crcCombo->addItem(QStringLiteral("CRC-8"), static_cast<int>(CrcAlgorithm::Crc8));
     m_crcCombo->addItem(QStringLiteral("CRC-16/CCITT-FALSE"), static_cast<int>(CrcAlgorithm::Crc16CcittFalse));
+    m_crcCombo->addItem(QStringLiteral("CRC-16/CCITT-FALSE (reverse)"), static_cast<int>(CrcAlgorithm::Crc16CcittFalseReverse));
     m_crcCombo->addItem(QStringLiteral("CRC-16/MODBUS"), static_cast<int>(CrcAlgorithm::Crc16Modbus));
+    m_crcCombo->addItem(QStringLiteral("CRC-16/MODBUS (reverse)"), static_cast<int>(CrcAlgorithm::Crc16ModbusReverse));
     m_crcCombo->addItem(QStringLiteral("CRC-16/XMODEM"), static_cast<int>(CrcAlgorithm::Crc16Xmodem));
+    m_crcCombo->addItem(QStringLiteral("CRC-16/XMODEM (reverse)"), static_cast<int>(CrcAlgorithm::Crc16XmodemReverse));
     m_crcCombo->addItem(QStringLiteral("CRC-16/IBM"), static_cast<int>(CrcAlgorithm::Crc16Ibm));
+    m_crcCombo->addItem(QStringLiteral("CRC-16/IBM (reverse)"), static_cast<int>(CrcAlgorithm::Crc16IbmReverse));
     m_crcCombo->addItem(QStringLiteral("CRC-32"), static_cast<int>(CrcAlgorithm::Crc32));
+    m_crcCombo->addItem(QStringLiteral("CRC-32 (reverse)"), static_cast<int>(CrcAlgorithm::Crc32Reverse));
     strategyRow->addWidget(m_crcCombo);
 
     m_fieldSpecLabel = new QLabel(tr("Fields:"), this);

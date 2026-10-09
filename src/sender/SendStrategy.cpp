@@ -43,58 +43,55 @@ quint64 crcValue(const QByteArray& data, quint64 poly, quint64 init, quint64 xor
 
 QByteArray crcBytes(CrcAlgorithm algo, const QByteArray& data)
 {
+    quint64 value = 0;
+    int byteCount = 0;
+    bool reverse = false;
+
     switch (algo) {
-    case CrcAlgorithm::Crc8: {
-        const quint8 c = static_cast<quint8>(crcValue(data, 0x07, 0x00, 0x00,
-                                                       false, false, 8));
-        return QByteArray(1, static_cast<char>(c));
-    }
-    case CrcAlgorithm::Crc16CcittFalse: {
-        const quint16 c = static_cast<quint16>(crcValue(data, 0x1021, 0xFFFF, 0x0000,
-                                                         false, false, 16));
-        QByteArray out;
-        out.append(static_cast<char>((c >> 8) & 0xFF));
-        out.append(static_cast<char>(c & 0xFF));
-        return out;
-    }
-    case CrcAlgorithm::Crc16Modbus: {
-        const quint16 c = static_cast<quint16>(crcValue(data, 0x8005, 0xFFFF, 0x0000,
-                                                         true, true, 16));
-        QByteArray out;
-        out.append(static_cast<char>((c >> 8) & 0xFF));
-        out.append(static_cast<char>(c & 0xFF));
-        return out;
-    }
-    case CrcAlgorithm::Crc16Xmodem: {
-        const quint16 c = static_cast<quint16>(crcValue(data, 0x1021, 0x0000, 0x0000,
-                                                         false, false, 16));
-        QByteArray out;
-        out.append(static_cast<char>((c >> 8) & 0xFF));
-        out.append(static_cast<char>(c & 0xFF));
-        return out;
-    }
-    case CrcAlgorithm::Crc16Ibm: {
-        const quint16 c = static_cast<quint16>(crcValue(data, 0x8005, 0x0000, 0x0000,
-                                                         true, true, 16));
-        QByteArray out;
-        out.append(static_cast<char>((c >> 8) & 0xFF));
-        out.append(static_cast<char>(c & 0xFF));
-        return out;
-    }
-    case CrcAlgorithm::Crc32: {
-        const quint32 c = static_cast<quint32>(crcValue(data, 0x04C11DB7, 0xFFFFFFFF,
-                                                         0xFFFFFFFF, true, true, 32));
-        QByteArray out;
-        out.append(static_cast<char>((c >> 24) & 0xFF));
-        out.append(static_cast<char>((c >> 16) & 0xFF));
-        out.append(static_cast<char>((c >> 8) & 0xFF));
-        out.append(static_cast<char>(c & 0xFF));
-        return out;
-    }
-    case CrcAlgorithm::None:
+    case CrcAlgorithm::Crc8:
+        value = crcValue(data, 0x07, 0x00, 0x00, false, false, 8);
+        byteCount = 1;
         break;
+    case CrcAlgorithm::Crc16CcittFalse:
+    case CrcAlgorithm::Crc16CcittFalseReverse:
+        value = crcValue(data, 0x1021, 0xFFFF, 0x0000, false, false, 16);
+        byteCount = 2;
+        reverse = (algo == CrcAlgorithm::Crc16CcittFalseReverse);
+        break;
+    case CrcAlgorithm::Crc16Modbus:
+    case CrcAlgorithm::Crc16ModbusReverse:
+        value = crcValue(data, 0x8005, 0xFFFF, 0x0000, true, true, 16);
+        byteCount = 2;
+        reverse = (algo == CrcAlgorithm::Crc16ModbusReverse);
+        break;
+    case CrcAlgorithm::Crc16Xmodem:
+    case CrcAlgorithm::Crc16XmodemReverse:
+        value = crcValue(data, 0x1021, 0x0000, 0x0000, false, false, 16);
+        byteCount = 2;
+        reverse = (algo == CrcAlgorithm::Crc16XmodemReverse);
+        break;
+    case CrcAlgorithm::Crc16Ibm:
+    case CrcAlgorithm::Crc16IbmReverse:
+        value = crcValue(data, 0x8005, 0x0000, 0x0000, true, true, 16);
+        byteCount = 2;
+        reverse = (algo == CrcAlgorithm::Crc16IbmReverse);
+        break;
+    case CrcAlgorithm::Crc32:
+    case CrcAlgorithm::Crc32Reverse:
+        value = crcValue(data, 0x04C11DB7, 0xFFFFFFFF, 0xFFFFFFFF, true, true, 32);
+        byteCount = 4;
+        reverse = (algo == CrcAlgorithm::Crc32Reverse);
+        break;
+    case CrcAlgorithm::None:
+        return {};
     }
-    return {};
+
+    QByteArray out;
+    for (int i = 0; i < byteCount; ++i) {
+        const int shift = reverse ? (8 * i) : (8 * (byteCount - 1 - i));
+        out.append(static_cast<char>((value >> shift) & 0xFF));
+    }
+    return out;
 }
 
 } // namespace

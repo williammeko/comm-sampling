@@ -23,6 +23,12 @@ enum class CrcAlgorithm {
     Crc16Xmodem = 4,
     Crc16Ibm = 5,
     Crc32 = 6,
+    // Byte-reversed variants (checksum bytes appended least-significant first).
+    Crc16CcittFalseReverse = 7,
+    Crc16ModbusReverse = 8,
+    Crc16XmodemReverse = 9,
+    Crc16IbmReverse = 10,
+    Crc32Reverse = 11,
 };
 
 // One field specification: replace `byteCount` bytes starting at `byteIndex`
