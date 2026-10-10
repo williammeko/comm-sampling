@@ -53,6 +53,7 @@ signals:
 
 private slots:
     void onSendClicked();
+    void onSendFileClicked();
     void onStopClicked();
     void onLoopToggled(bool checked);
     void onHistoryChanged();
@@ -73,6 +74,7 @@ private:
     QSpinBox* m_intervalSpin = nullptr;
     QPushButton* m_sendButton = nullptr;
     QPushButton* m_stopButton = nullptr;
+    QPushButton* m_sendFileButton = nullptr;
 
     QComboBox* m_strategyCombo = nullptr;
     QLabel* m_crcLabel = nullptr;

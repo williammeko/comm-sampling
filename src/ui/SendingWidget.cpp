@@ -5,6 +5,8 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFile>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -44,11 +46,13 @@ SendingWidget::SendingWidget(DataSender* sender, QWidget* parent)
     m_sendButton = new QPushButton(tr("Send"), this);
     m_stopButton = new QPushButton(tr("Stop"), this);
     m_stopButton->setEnabled(false);
+    m_sendFileButton = new QPushButton(tr("Send file"), this);
 
     row->addWidget(m_loopCheck);
     row->addWidget(m_intervalSpin);
     row->addWidget(m_sendButton);
     row->addWidget(m_stopButton);
+    row->addWidget(m_sendFileButton);
     layout->addLayout(row);
 
     // Row 2: strategy + crc algorithm + field spec.
@@ -99,6 +103,7 @@ SendingWidget::SendingWidget(DataSender* sender, QWidget* parent)
 
     connect(m_loopCheck, &QCheckBox::toggled, this, &SendingWidget::onLoopToggled);
     connect(m_sendButton, &QPushButton::clicked, this, &SendingWidget::onSendClicked);
+    connect(m_sendFileButton, &QPushButton::clicked, this, &SendingWidget::onSendFileClicked);
     connect(m_stopButton, &QPushButton::clicked, this, &SendingWidget::onStopClicked);
     if (m_sender)
         connect(m_sender, &DataSender::historyChanged, this, &SendingWidget::onHistoryChanged);
@@ -160,6 +165,46 @@ void SendingWidget::onStopClicked()
         m_sender->stopLoop();
     m_looping = false;
     refreshButtons();
+}
+
+void SendingWidget::onSendFileClicked()
+{
+    if (!m_connected) {
+        QMessageBox::warning(this, tr("Not connected"),
+                             tr("Please connect to a device first."));
+        return;
+    }
+    if (!m_sender)
+        return;
+
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Send file"), QString(), tr("All files (*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, tr("Open failed"),
+                             tr("Could not open the selected file."));
+        return;
+    }
+
+    constexpr qint64 kMaxBytes = 100 * 1024; // 100 KB
+    QByteArray data = file.readAll();
+    file.close();
+
+    if (data.size() > kMaxBytes) {
+        const auto answer = QMessageBox::question(
+            this, tr("Confirm"),
+            tr("warning: only 100 kb can be sent. \nsend anyway?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (answer != QMessageBox::Yes)
+            return;
+        data.truncate(static_cast<int>(kMaxBytes));
+    }
+
+    recordSent(data);
+    m_sender->sendOnce(data);
 }
 
 void SendingWidget::onLoopToggled(bool checked)
@@ -336,6 +381,7 @@ void SendingWidget::recordSent(const QByteArray& data)
 void SendingWidget::refreshButtons()
 {
     m_sendButton->setEnabled(m_connected && !m_looping);
+    m_sendFileButton->setEnabled(m_connected && !m_looping);
     m_stopButton->setEnabled(m_looping);
     m_loopCheck->setEnabled(!m_looping);
 }
