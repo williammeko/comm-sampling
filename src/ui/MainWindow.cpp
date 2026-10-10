@@ -9,17 +9,18 @@
 #include "sender/DataSender.h"
 #include "sender/SendStrategy.h"
 #include "ui/CommunicationSettingsWidget.h"
+#include "ui/DataViewWidget.h"
 #include "ui/MatchersWidget.h"
 #include "ui/ProfileWidget.h"
-#include "ui/SectionWidget.h"
 #include "ui/SendingWidget.h"
 
 #include <QCoreApplication>
-#include <QGroupBox>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QSplitter>
 #include <QStatusBar>
+#include <QTabWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -44,20 +45,36 @@ MainWindow::MainWindow(QWidget* parent)
     m_matchersWidget = new MatchersWidget(central);
     m_profileWidget = new ProfileWidget(central);
     m_lineChartWidget = new LineChartWidget(central);
+    m_dataviewWidget = new DataViewWidget(central);
 
-    m_commGroup = new QGroupBox(central);
-    auto* commGroupLayout = new QVBoxLayout(m_commGroup);
-    commGroupLayout->addWidget(m_commWidget);
+    // Left part: tab pages (communication + sending, and matchers).
+    auto* dataTab = new QWidget(central);
+    auto* dataTabLayout = new QVBoxLayout(dataTab);
+    dataTabLayout->setContentsMargins(4, 4, 4, 4);
+    dataTabLayout->addWidget(m_commWidget);
+    dataTabLayout->addWidget(m_sendingWidget, 1);
 
-    m_dataInteractionSection = new SectionWidget(tr("data interaction"), m_sendingWidget, central);
-    m_matcherSettingSection = new SectionWidget(tr("matcher setting"), m_matchersWidget, central);
-    m_lineChartSection = new SectionWidget(tr("line chart"), m_lineChartWidget, central);
+    m_leftTabs = new QTabWidget(central);
+    m_leftTabs->addTab(dataTab, tr("data interaction"));
+    m_leftTabs->addTab(m_matchersWidget, tr("matcher setting"));
+
+    // Right part: data view on top, line chart filling the rest.
+    auto* rightWidget = new QWidget(central);
+    auto* rightLayout = new QVBoxLayout(rightWidget);
+    rightLayout->setContentsMargins(4, 4, 4, 4);
+    rightLayout->addWidget(m_dataviewWidget);
+    rightLayout->addWidget(m_lineChartWidget, 1);
+
+    m_mainSplitter = new QSplitter(Qt::Horizontal, central);
+    m_mainSplitter->addWidget(m_leftTabs);
+    m_mainSplitter->addWidget(rightWidget);
+    m_mainSplitter->setStretchFactor(0, 1);
+    m_mainSplitter->setStretchFactor(1, 1);
+    m_mainSplitter->setSizes({500, 500});
+    m_mainSplitter->setHandleWidth(10);
 
     m_centralLayout->addWidget(m_profileWidget);
-    m_centralLayout->addWidget(m_commGroup);
-    m_centralLayout->addWidget(m_dataInteractionSection);
-    m_centralLayout->addWidget(m_matcherSettingSection);
-    m_centralLayout->addWidget(m_lineChartSection, 1);
+    m_centralLayout->addWidget(m_mainSplitter, 1);
     setCentralWidget(central);
 
     // Sending goes through the active channel.
@@ -94,19 +111,8 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_matchersWidget, &MatchersWidget::matchersChanged,
             this, &MainWindow::onMatchersChanged);
 
-    connect(m_dataInteractionSection, &SectionWidget::maximizeRequested,
-            this, [this]() { maximizeSection(m_dataInteractionSection); });
-    connect(m_matcherSettingSection, &SectionWidget::maximizeRequested,
-            this, [this]() { maximizeSection(m_matcherSettingSection); });
-    connect(m_lineChartSection, &SectionWidget::maximizeRequested,
-            this, [this]() { maximizeSection(m_lineChartSection); });
-
-    connect(m_dataInteractionSection, &SectionWidget::restoreRequested,
-            this, &MainWindow::restoreSections);
-    connect(m_matcherSettingSection, &SectionWidget::restoreRequested,
-            this, &MainWindow::restoreSections);
-    connect(m_lineChartSection, &SectionWidget::restoreRequested,
-            this, &MainWindow::restoreSections);
+    connect(m_sendingWidget, &SendingWidget::dataSent, this,
+            [this](const QByteArray& data) { m_dataviewWidget->appendSent(data); });
 
     m_sendingWidget->setConnected(false);
     rebuildChartSeries();
@@ -147,7 +153,7 @@ void MainWindow::onConnectRequested()
     m_byteCache->setCapacity(m_commWidget->byteCacheSize());
     m_byteCache->clear();
     m_sendingWidget->clearReceivedData();
-    m_sendingWidget->clearSendPreview();
+    m_dataviewWidget->clear();
 
     switch (m_commWidget->mode()) {
     case ChannelMode::Serial:
@@ -199,8 +205,13 @@ void MainWindow::onDrainCache()
 
 void MainWindow::onFrameMatched(int matcherIndex, const QByteArray& frame)
 {
-    m_matchersWidget->showFrame(matcherIndex, frame);
     m_frameCounts[matcherIndex] += 1;
+
+    const auto it = m_keywordMatcherToOrdinal.constFind(matcherIndex);
+    if (it != m_keywordMatcherToOrdinal.constEnd())
+        m_dataviewWidget->showFrame(it.value(), frame);
+    else
+        m_matchersWidget->showFrame(matcherIndex, frame); // picker input frames
 }
 
 void MainWindow::onPickerValueChanged(int matcherIndex, int pickerIndex,
@@ -269,6 +280,17 @@ void MainWindow::rebuildChartSeries()
     for (const Matcher* matcher : matchers)
         isPicker.append(matcher->type() == Matcher::Type::DecimalPicker);
     m_lineChartWidget->setSpeedMatchers(isPicker);
+
+    m_keywordMatcherToOrdinal.clear();
+    QStringList frameTitles;
+    int keywordOrdinal = 0;
+    for (int mi = 0; mi < matchers.size(); ++mi) {
+        if (matchers.at(mi)->type() == Matcher::Type::FixedKeywordFrame) {
+            m_keywordMatcherToOrdinal.insert(mi, keywordOrdinal++);
+            frameTitles.append(tr("Matched frames (Matcher %1):").arg(mi + 1));
+        }
+    }
+    m_dataviewWidget->setMatchers(frameTitles);
 
     m_frameCounts.clear();
     m_valueCounts.clear();
@@ -344,37 +366,6 @@ void MainWindow::saveRecentData()
     m_state.keywordHistory = m_matchersWidget->keywordHistory();
 
     RecentDataStore::save(m_state);
-}
-
-void MainWindow::maximizeSection(SectionWidget* section)
-{
-    const QList<SectionWidget*> sections = {
-        m_dataInteractionSection, m_matcherSettingSection, m_lineChartSection
-    };
-
-    // Non-section widgets have no title bar to fold into, so hide them.
-    m_profileWidget->setVisible(false);
-    m_commGroup->setVisible(false);
-
-    for (SectionWidget* s : sections) {
-        const bool current = (s == section);
-        s->setCollapsed(!current);
-        m_centralLayout->setStretchFactor(s, current ? 1 : 0);
-    }
-}
-
-void MainWindow::restoreSections()
-{
-    m_profileWidget->setVisible(true);
-    m_commGroup->setVisible(true);
-
-    m_dataInteractionSection->setCollapsed(false);
-    m_matcherSettingSection->setCollapsed(false);
-    m_lineChartSection->setCollapsed(false);
-
-    m_centralLayout->setStretchFactor(m_dataInteractionSection, 0);
-    m_centralLayout->setStretchFactor(m_matcherSettingSection, 0);
-    m_centralLayout->setStretchFactor(m_lineChartSection, 1);
 }
 
 void MainWindow::onChannelError(const QString& message)

@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("comm-sampling"));
 
     comm::MainWindow window;
-    window.resize(760, 960);
+    window.resize(1000, 800);
     window.show();
 
     return app.exec();

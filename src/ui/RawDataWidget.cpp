@@ -34,8 +34,7 @@ RawDataWidget::RawDataWidget(QWidget* parent)
     m_view->setLineWrapMode(QPlainTextEdit::WidgetWidth);
     m_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     m_view->setMinimumHeight(48);
-    m_view->setMaximumHeight(120);
-    layout->addWidget(m_view);
+    layout->addWidget(m_view, 1);
 
     connect(m_maxBytesSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &RawDataWidget::settingsChanged);

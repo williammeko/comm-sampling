@@ -9,9 +9,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QPlainTextEdit>
 #include <QPushButton>
-#include <QScrollBar>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -91,18 +89,9 @@ SendingWidget::SendingWidget(DataSender* sender, QWidget* parent)
 
     layout->addLayout(strategyRow);
 
-    // Sending preview.
-    layout->addWidget(new QLabel(tr("Sending preview:"), this));
-    m_sendPreview = new QPlainTextEdit(this);
-    m_sendPreview->setReadOnly(true);
-    m_sendPreview->setMaximumBlockCount(500);
-    m_sendPreview->setMinimumHeight(48);
-    m_sendPreview->setMaximumHeight(120);
-    layout->addWidget(m_sendPreview);
-
     // Receiving preview (raw data).
     m_rawDataWidget = new RawDataWidget(this);
-    layout->addWidget(m_rawDataWidget);
+    layout->addWidget(m_rawDataWidget, 1);
 
     onHistoryChanged();
     updateStrategyUi();
@@ -328,12 +317,6 @@ void SendingWidget::clearReceivedData()
         m_rawDataWidget->clear();
 }
 
-void SendingWidget::clearSendPreview()
-{
-    if (m_sendPreview)
-        m_sendPreview->clear();
-}
-
 int SendingWidget::rawDataMaxBytes() const
 {
     return m_rawDataWidget ? m_rawDataWidget->maxBytes() : 2000;
@@ -347,11 +330,7 @@ void SendingWidget::setRawDataMaxBytes(int bytes)
 
 void SendingWidget::recordSent(const QByteArray& data)
 {
-    if (!m_sendPreview)
-        return;
-
-    m_sendPreview->appendPlainText(HexUtils::toHexString(data));
-    m_sendPreview->verticalScrollBar()->setValue(m_sendPreview->verticalScrollBar()->maximum());
+    emit dataSent(data);
 }
 
 void SendingWidget::refreshButtons()

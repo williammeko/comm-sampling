@@ -14,7 +14,8 @@
 
 class QTimer;
 class QVBoxLayout;
-class QGroupBox;
+class QSplitter;
+class QTabWidget;
 
 namespace comm {
 
@@ -22,7 +23,7 @@ class CommunicationSettingsWidget;
 class SendingWidget;
 class MatchersWidget;
 class ProfileWidget;
-class SectionWidget;
+class DataViewWidget;
 class ChannelManager;
 class ByteCache;
 class MatcherPipeline;
@@ -58,8 +59,6 @@ private:
     void saveRecentData();
     QJsonObject buildState() const;
     void applyState(const QJsonObject& state);
-    void maximizeSection(SectionWidget* section);
-    void restoreSections();
 
     CommunicationSettingsWidget* m_commWidget = nullptr;
     SendingWidget* m_sendingWidget = nullptr;
@@ -82,13 +81,13 @@ private:
     QHash<int, quint64> m_valueCounts;
 
     QVBoxLayout* m_centralLayout = nullptr;
-    QGroupBox* m_commGroup = nullptr;
-    SectionWidget* m_dataInteractionSection = nullptr;
-    SectionWidget* m_matcherSettingSection = nullptr;
-    SectionWidget* m_lineChartSection = nullptr;
+    QSplitter* m_mainSplitter = nullptr;
+    QTabWidget* m_leftTabs = nullptr;
+    DataViewWidget* m_dataviewWidget = nullptr;
 
     QList<SeriesInfo> m_series;
     QHash<int, int> m_pickerToSeries; // key = matcherIndex*10000 + pickerIndex
+    QHash<int, int> m_keywordMatcherToOrdinal; // full matcher index -> keyword ordinal
 
     RecentDataStore::State m_state;
     bool m_loadingState = false;

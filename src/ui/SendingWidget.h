@@ -11,7 +11,6 @@ class QCheckBox;
 class QSpinBox;
 class QPushButton;
 class QLabel;
-class QPlainTextEdit;
 
 namespace comm {
 
@@ -45,11 +44,11 @@ public:
 
     void appendReceivedBytes(const QByteArray& bytes);
     void clearReceivedData();
-    void clearSendPreview();
     int rawDataMaxBytes() const;
     void setRawDataMaxBytes(int bytes);
 
 signals:
+    void dataSent(const QByteArray& data);
     void settingsChanged();
 
 private slots:
@@ -81,7 +80,6 @@ private:
     QLabel* m_fieldSpecLabel = nullptr;
     QComboBox* m_fieldSpecCombo = nullptr;
 
-    QPlainTextEdit* m_sendPreview = nullptr;
     RawDataWidget* m_rawDataWidget = nullptr;
 
     SendStrategy m_strategy;

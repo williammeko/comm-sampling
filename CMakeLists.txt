@@ -26,6 +26,7 @@ set(PROJECT_SOURCES
     src/sender/SendStrategy.cpp
     src/ui/MainWindow.cpp
     src/ui/CommunicationSettingsWidget.cpp
+    src/ui/DataViewWidget.cpp
     src/ui/SendingWidget.cpp
     src/ui/ProfileWidget.cpp
     src/ui/RawDataWidget.cpp

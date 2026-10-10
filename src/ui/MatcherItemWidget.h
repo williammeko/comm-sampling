@@ -69,7 +69,7 @@ private:
     QComboBox* m_keywordCombo = nullptr;
     QSpinBox* m_frameLengthSpin = nullptr;
 
-    // Matched-frames view (fixed-keyword only)
+    // Input frames view (decimal-picker only)
     QPlainTextEdit* m_resultEdit = nullptr;
     QSpinBox* m_keepFramesSpin = nullptr;
 

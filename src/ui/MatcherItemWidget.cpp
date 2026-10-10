@@ -438,21 +438,6 @@ MatcherItemWidget::MatcherItemWidget(Matcher* matcher, int index, QWidget* paren
         m_keywordCombo->setEditText(HexUtils::toHexString(keywordMatcher->keyword()));
         m_frameLengthSpin->setValue(keywordMatcher->frameLength());
 
-        auto* resultHeader = new QHBoxLayout;
-        resultHeader->addWidget(new QLabel(tr("Matched frames:"), this));
-        resultHeader->addStretch(1);
-        resultHeader->addWidget(new QLabel(tr("Keep:"), this));
-        m_keepFramesSpin = new QSpinBox(this);
-        m_keepFramesSpin->setRange(1, 10000);
-        m_keepFramesSpin->setValue(100);
-        resultHeader->addWidget(m_keepFramesSpin);
-        outer->addLayout(resultHeader);
-
-        m_resultEdit = new QPlainTextEdit(this);
-        m_resultEdit->setReadOnly(true);
-        m_resultEdit->setMinimumHeight(80);
-        outer->addWidget(m_resultEdit);
-
         connect(m_keywordCombo, &QComboBox::editTextChanged,
                 this, &MatcherItemWidget::onKeywordTextChanged);
         connect(m_keywordCombo->lineEdit(), &QLineEdit::editingFinished,
