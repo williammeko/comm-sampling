@@ -277,18 +277,6 @@ protected:
             }
         }
 
-        // Legend: names in their series colors, top-right.
-        int legendX = area.right();
-        const int legendY = rect().top() + 2;
-        for (const SeriesData& s : m_series) {
-            const int textWidth = painter.fontMetrics().horizontalAdvance(s.name) + 14;
-            legendX -= textWidth;
-            if (legendX < area.left())
-                break;
-            painter.setPen(s.color);
-            painter.drawText(QRect(legendX, legendY, textWidth, 16),
-                             Qt::AlignRight | Qt::AlignVCenter, s.name);
-        }
     }
 
     void wheelEvent(QWheelEvent* event) override
